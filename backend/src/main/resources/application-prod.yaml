@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: ${PROD_DB_URL} # 환경 변수 사용 권장
+    username: ${PROD_DB_USERNAME}
+    password: ${PROD_DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate # 실제 DB와 엔티티가 일치하는지만 검사
+    show-sql: false # 운영 중에는 성능을 위해 끔
+    properties:
+      hibernate:
+        format_sql: false
