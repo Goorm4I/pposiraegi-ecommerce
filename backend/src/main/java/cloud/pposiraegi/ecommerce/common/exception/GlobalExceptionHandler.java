@@ -1,4 +1,4 @@
-package cloud.pposiraegi.ecommerce.global.common.exception;
+package cloud.pposiraegi.ecommerce.common.exception;
 
 import cloud.pposiraegi.user_service.common.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;

@@ -1,4 +1,4 @@
-package cloud.pposiraegi.ecommerce.global.common.entity;
+package cloud.pposiraegi.ecommerce.common.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;

@@ -1,4 +1,4 @@
-package cloud.pposiraegi.ecommerce.global.common.generator;
+package cloud.pposiraegi.ecommerce.common.generator;
 
 import com.github.f4b6a3.tsid.TsidFactory;
 import org.hibernate.engine.spi.SharedSessionContractImplementor;

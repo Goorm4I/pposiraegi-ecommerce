@@ -1,4 +1,4 @@
-package cloud.pposiraegi.ecommerce.global.common.dto;
+package cloud.pposiraegi.ecommerce.common.dto;
 
 public record ApiResponse<T>(String status, String code, String message, T data) {
     public static <T> ApiResponse<T> success(String code, String message, T data) {
