@@ -42,8 +42,13 @@ dependencies {
 
     // TSID Creater
     implementation 'com.github.f4b6a3:tsid-creator:5.2.6'
+
+    // 테스트 전용
+    // H2 DB
+    testRuntimeOnly 'com.h2database:h2'
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
+    systemProperty 'spring.profiles.active', 'test'
 }

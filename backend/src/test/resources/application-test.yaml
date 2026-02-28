@@ -1,10 +1,19 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/ecommerce_test_db
-    username: postgres
-    password: password
+
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
 
   jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect # 테스트 시에는 H2 방언 사용
+        format_sql: true
+        use_sql_comments: true
     hibernate:
-      ddl-auto: create-drop # 테스트 시작 시 생성, 종료 시 삭제
+      ddl-auto: create-drop
     show-sql: true
+
+
