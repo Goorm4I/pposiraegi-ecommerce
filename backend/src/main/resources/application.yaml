@@ -1,16 +1,16 @@
 spring:
-  profiles:
-    active: dev
   application:
     name: "PPosiraegi-Backend"
+  profiles:
+    active: dev
 
   jpa:
     open-in-view: false
     properties:
       hibernate:
         default_batch_fetch_size: 100 # N+1 Problem
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+
 
 app:
   jwt:
-    expiration-ms: 3600000
+    expiration-ms: 1h
