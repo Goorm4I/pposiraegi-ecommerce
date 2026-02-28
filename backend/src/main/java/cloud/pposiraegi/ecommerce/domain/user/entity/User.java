@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 
 @Getter
 @Entity
+@Table(name = "users")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User extends BaseUpdatedEntity {
     @Id
@@ -82,7 +83,4 @@ public class User extends BaseUpdatedEntity {
         this.status = UserStatus.DELETED;
         this.deletedAt = LocalDateTime.now();
     }
-
-
-
 }
