@@ -67,4 +67,6 @@ class UserServiceTest {
         // 3. 결과 확인
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EMAIL_DUPLICATION);
     }
+
+    // TODO: 닉네임 마스킹 로직 테스트
 }

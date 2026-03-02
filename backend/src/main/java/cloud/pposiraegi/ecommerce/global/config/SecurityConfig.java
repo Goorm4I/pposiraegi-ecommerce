@@ -22,6 +22,7 @@ public class SecurityConfig {
 
     private final TokenProvider tokenProvider;
 
+    // TODO: CORS 설정
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http

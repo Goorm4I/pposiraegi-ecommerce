@@ -16,13 +16,6 @@ public class UserDto {
     ) {
     }
 
-    public record UpdateProfileRequest(
-            String nickname,
-            String phoneNumber,
-            String profileImageUrl
-    ) {
-    }
-
     public record SimpleResponse(
             Long id,
             String nickname,

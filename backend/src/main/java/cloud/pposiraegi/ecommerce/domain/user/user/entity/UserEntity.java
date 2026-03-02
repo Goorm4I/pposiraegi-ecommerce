@@ -20,7 +20,7 @@ public class UserEntity extends BaseUpdatedEntity {
     @Id
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String email;
 
     @Column(name = "password_hash", nullable = false)
@@ -77,7 +77,7 @@ public class UserEntity extends BaseUpdatedEntity {
         this.profileImageUrl = profileImageUrl;
     }
 
-    public void withDraw() {
+    public void withdraw() {
         if (this.status == UserStatus.WITHDRAWN) {
             throw new IllegalStateException("이미 탈퇴한 회원입니다.");
         }
