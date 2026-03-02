@@ -1,8 +1,9 @@
 package cloud.pposiraegi.ecommerce.domain.user.service;
 
-import cloud.pposiraegi.ecommerce.common.exception.BusinessException;
-import cloud.pposiraegi.ecommerce.common.exception.ErrorCode;
-import cloud.pposiraegi.ecommerce.domain.user.dto.UserDto;
+import cloud.pposiraegi.ecommerce.domain.user.user.dto.UserDto;
+import cloud.pposiraegi.ecommerce.domain.user.user.service.UserService;
+import cloud.pposiraegi.ecommerce.global.common.exception.BusinessException;
+import cloud.pposiraegi.ecommerce.global.common.exception.ErrorCode;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,4 +67,6 @@ class UserServiceTest {
         // 3. 결과 확인
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EMAIL_DUPLICATION);
     }
+
+    // TODO: 닉네임 마스킹 로직 테스트
 }

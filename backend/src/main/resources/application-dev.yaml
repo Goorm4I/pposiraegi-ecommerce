@@ -6,9 +6,19 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create
     show-sql: true
     properties:
       hibernate:
         format_sql: true
         use_sql_comments: true
+
+logging:
+  level:
+    cloud.pposiraegi.ecommerce: DEBUG
+    org.springframework.web: DEBUG
+
+jwt:
+  secret: "iqe7Fa7xrhXwJ5SLoee88Yg7DeUuJflj4+IE/XIl81tmZ24qNd4tCUble1Zk2drO="
+  access-token-validity-in-milliseconds: 3600000
+  refresh-token-validity-in-milliseconds: 86400000

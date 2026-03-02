@@ -2,10 +2,9 @@ package cloud.pposiraegi.ecommerce;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration;
-import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 @SpringBootTest
 public class ConfigCheckTest {
@@ -17,7 +16,7 @@ public class ConfigCheckTest {
 
     @Test
     void checkConfig() {
-        System.out.println("DB URL: " + dbUrl);
-        System.out.println("DB Username: " + dbUsername);
+        assertThat(dbUrl).isNotBlank();
+        assertThat(dbUsername).isNotBlank();
     }
 }
