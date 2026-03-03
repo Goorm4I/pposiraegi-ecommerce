@@ -1,6 +1,7 @@
 package cloud.pposiraegi.ecommerce.global.config;
 
 import cloud.pposiraegi.ecommerce.global.auth.filter.JwtAuthenticationFilter;
+import cloud.pposiraegi.ecommerce.global.auth.filter.JwtExceptionFilter;
 import cloud.pposiraegi.ecommerce.global.auth.jwt.TokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -19,8 +20,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
-
     private final TokenProvider tokenProvider;
+    private final JwtExceptionFilter jwtExceptionFilter;
 
     // TODO: CORS 설정
     @Bean
@@ -41,8 +42,9 @@ public class SecurityConfig {
 
                 .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
 
-                // 필터 등록
-                .addFilterBefore(new JwtAuthenticationFilter(tokenProvider), UsernamePasswordAuthenticationFilter.class);
+                // 필터 등록)
+                .addFilterBefore(new JwtAuthenticationFilter(tokenProvider), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtExceptionFilter, JwtAuthenticationFilter.class);
 
 
         return http.build();
