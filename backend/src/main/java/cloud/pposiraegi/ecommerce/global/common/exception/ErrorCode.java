@@ -30,8 +30,10 @@ public enum ErrorCode {
     // 순수하게 유저 정보를 조회/수정할 때 발생하는 에러만 남김
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "사용자 정보를 찾을 수 없습니다."),
     EMAIL_DUPLICATION(HttpStatus.BAD_REQUEST, "U002", "이미 존재하는 이메일입니다."),
-    CART_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "U003", "장바구니 아이템이 존재하지 않습니다."),
-
+    ADDRESS_NOT_FOUND(HttpStatus.NOT_FOUND, "U003", "배송지를 찾을 수 없거나 접근 권한이 없습니다."),
+    DEFAULT_ADDRESS_DELETE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "U004", "기본 배송지는 삭제할 수 없습니다. 다른 주소를 기본으로 설정해 주세요."),
+    ADDRESS_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "U005", "배송지는 최대 20개까지만 등록할 수 있습니다."),
+    CART_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "U010", "장바구니 아이템이 존재하지 않습니다."),
     // Product & Review (상품 도메인)
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "P001", "상품을 찾을 수 없습니다."),
     OUT_OF_STOCK(HttpStatus.BAD_REQUEST, "P002", "재고가 부족합니다."),
@@ -42,6 +44,7 @@ public enum ErrorCode {
 
     // Promotion (프로모션 도메인)
     COUPON_EXPIRED(HttpStatus.BAD_REQUEST, "M001", "만료된 쿠폰입니다.");
+
 
     private final HttpStatus status;
     private final String code;

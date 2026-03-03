@@ -1,7 +1,6 @@
 package cloud.pposiraegi.ecommerce.global.auth.jwt;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -55,13 +54,8 @@ public class TokenProvider {
     }
 
     public boolean validateToken(String token) {
-        try {
-            parseClaims(token);
-            return true;
-        } catch (JwtException | IllegalArgumentException e) {
-            log.info("JWT 검증 실패: {}", e.getMessage());
-            return false;
-        }
+        parseClaims(token);
+        return true;
     }
 
     public Authentication getAuthentication(String token) {
@@ -74,12 +68,7 @@ public class TokenProvider {
     }
 
     public Long getUserIdFromToken(String token) {
-        try {
-            return Long.parseLong(parseClaims(token).getSubject());
-        } catch (JwtException | IllegalArgumentException e) {
-            log.info("JWT 검증 실패: {}", e.getMessage());
-            return null;
-        }
+        return Long.parseLong(parseClaims(token).getSubject());
     }
 
     public String resolveToken(String bearerToken) {
