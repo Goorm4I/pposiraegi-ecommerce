@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:15  # 인프라 트러블슈팅을 위해 풀 버전 사용
+    container_name: pposiraegi-db
+    environment:
+      POSTGRES_DB: ecommerce
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d ecommerce"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend  # 💡 도커가 작업할 '기준 디렉토리'를 backend 폴더로 지정
+      dockerfile: Dockerfile
+    container_name: pposiraegi-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/ecommerce
+      SPRING_DATASOURCE_USERNAME: user
+      SPRING_DATASOURCE_PASSWORD: password
+      JWT_SECRET: "8k8gRYoBudweyETDGCGi6soWOrMP09V9VrArAZ+kUd0="
+    depends_on:
+      db:
+        condition: service_healthy
