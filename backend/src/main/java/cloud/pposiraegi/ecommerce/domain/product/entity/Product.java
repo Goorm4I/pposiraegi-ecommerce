@@ -44,8 +44,8 @@ public class Product {
     @Column(name = "origin_price", nullable = false)
     private Integer originPrice;
 
-    @Column(name = "sale_price")
-    private Integer salePrice = 0;
+    @Column(name = "sale_price", nullable = false)
+    private Integer salePrice;
 
     @Column(name = "status", nullable = false)
     private ProductStatus status = ProductStatus.PREPARING;
@@ -58,7 +58,7 @@ public class Product {
         this.description = description;
         this.brandName = brandName;
         this.originPrice = originPrice;
-        this.salePrice = salePrice != null ? salePrice : 0;
+        this.salePrice = salePrice != null ? salePrice : originPrice;
         this.status = status != null ? status : ProductStatus.PREPARING;
     }
 }

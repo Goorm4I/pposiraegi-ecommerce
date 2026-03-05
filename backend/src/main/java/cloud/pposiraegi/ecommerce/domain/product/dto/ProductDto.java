@@ -5,46 +5,50 @@ import cloud.pposiraegi.ecommerce.domain.product.entity.ProductSku;
 import cloud.pposiraegi.ecommerce.domain.product.enums.ImageType;
 import cloud.pposiraegi.ecommerce.domain.product.enums.ProductStatus;
 import cloud.pposiraegi.ecommerce.domain.product.enums.SkuStatus;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
 public class ProductDto {
     public record ProductCreateRequest(
-            @NotBlank Long categoryId,
+            @NotNull Long categoryId,
             @NotBlank String name,
             String description,
             String brandName,
-            @NotBlank @Min(0) Integer originPrice,
+            @NotNull @Min(0) Integer originPrice,
+            // 판매가격이 정가보다 높지 못하게 검증
             @Min(0) Integer salePrice,
-            ProductStatus status,
+            @NotNull ProductStatus status,
 
-            List<ImageRequest> images,
-            List<OptionGroupRequest> optionGroups,
-            List<SkuRequest> skus
+            @Valid List<ImageRequest> images,
+            @Valid List<OptionGroupRequest> optionGroups,
+            @NotEmpty @Valid List<SkuRequest> skus
     ) {
     }
 
     public record ImageRequest(
             @NotBlank String imageUrl,
-            ImageType imageType,
-            Integer displayOrder
+            @NotNull ImageType imageType,
+            @NotNull Integer displayOrder
     ) {
     }
 
     public record OptionGroupRequest(
             @NotBlank String optionName,
-            List<String> optionsValues
+            @NotEmpty List<String> optionsValues
     ) {
     }
 
     public record SkuRequest(
             String skuCode,
-            SkuStatus status,
+            @NotNull SkuStatus status,
             @Min(0) Integer additionalPrice,
             @Min(0) Integer stockQuantity,
-            List<String> selectedOptionValues
+            @NotNull List<String> selectedOptionValues
     ) {
     }
 

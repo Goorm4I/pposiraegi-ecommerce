@@ -3,6 +3,7 @@ package cloud.pposiraegi.ecommerce.domain.product.controller;
 import cloud.pposiraegi.ecommerce.domain.product.dto.ProductDto;
 import cloud.pposiraegi.ecommerce.domain.product.service.ProductService;
 import cloud.pposiraegi.ecommerce.global.common.dto.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -16,7 +17,7 @@ public class ProductAdminController {
     private final ProductService productService;
 
     @PostMapping
-    public ApiResponse<Void> createProduct(@RequestBody ProductDto.ProductCreateRequest request) {
+    public ApiResponse<Void> createProduct(@Valid @RequestBody ProductDto.ProductCreateRequest request) {
         productService.createProduct(request);
         return ApiResponse.success(null);
     }
