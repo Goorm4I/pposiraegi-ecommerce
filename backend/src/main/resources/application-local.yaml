@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/ecommerce
+    url: jdbc:postgresql://localhost:15432/ecommerce
     username: postgres
     password: "0000"
 
@@ -22,3 +22,6 @@ jwt:
   secret: "iqe7Fa7xrhXwJ5SLoee88Yg7DeUuJflj4+IE/XIl81tmZ24qNd4tCUble1Zk2drO="
   access-token-validity-in-milliseconds: 3600000
   refresh-token-validity-in-milliseconds: 86400000
+
+storage:
+  location: C:/tmp/pposiraegi/uploads/images

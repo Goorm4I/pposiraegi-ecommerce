@@ -1,7 +1,6 @@
 package cloud.pposiraegi.ecommerce.domain.user.user.entity;
 
 import cloud.pposiraegi.ecommerce.domain.common.PhoneNumber;
-import cloud.pposiraegi.ecommerce.domain.user.common.UserStatus;
 import cloud.pposiraegi.ecommerce.global.common.entity.BaseUpdatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
