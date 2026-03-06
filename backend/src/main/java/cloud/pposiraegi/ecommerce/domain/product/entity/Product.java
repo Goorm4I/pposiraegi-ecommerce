@@ -41,17 +41,17 @@ public class Product {
     @Column(name = "brand_name", length = 50)
     private String brandName;
 
-    @Column(name = "origin_price", nullable = false)
-    private Integer originPrice;
+    @Column(name = "origin_price", precision = 12, scale = 2, nullable = false)
+    private BigDecimal originPrice;
 
-    @Column(name = "sale_price", nullable = false)
-    private Integer salePrice;
+    @Column(name = "sale_price", precision = 12, scale = 2, nullable = false)
+    private BigDecimal salePrice;
 
     @Column(name = "status", nullable = false)
     private ProductStatus status = ProductStatus.PREPARING;
 
     @Builder
-    public Product(Long id, Long categoryId, String name, String description, String brandName, Integer originPrice, Integer salePrice, ProductStatus status) {
+    public Product(Long id, Long categoryId, String name, String description, String brandName, BigDecimal originPrice, BigDecimal salePrice, ProductStatus status) {
         this.id = id;
         this.categoryId = categoryId;
         this.name = name;
