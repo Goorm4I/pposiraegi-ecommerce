@@ -1,6 +1,7 @@
 package cloud.pposiraegi.ecommerce.domain.user.user.entity;
 
 import cloud.pposiraegi.ecommerce.domain.common.PhoneNumber;
+import cloud.pposiraegi.ecommerce.domain.user.user.enums.UserStatus;
 import cloud.pposiraegi.ecommerce.global.common.entity.BaseUpdatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -15,7 +16,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "users")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class UserEntity extends BaseUpdatedEntity {
+public class User extends BaseUpdatedEntity {
     @Id
     private Long id;
 
@@ -45,7 +46,7 @@ public class UserEntity extends BaseUpdatedEntity {
     private LocalDateTime deletedAt;
 
     @Builder
-    public UserEntity(Long id, String email, String passwordHash, String name, String nickname, PhoneNumber phoneNumber) {
+    public User(Long id, String email, String passwordHash, String name, String nickname, PhoneNumber phoneNumber) {
         Assert.notNull(id, "ID는 비어있을 수 없습니다.");
         Assert.hasText(email, "이메일 주소는 비어있을 수 없습니다.");
         Assert.hasText(passwordHash, "비밀번호 해쉬는 비어있을 수 없습니다.");

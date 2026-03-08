@@ -1,6 +1,6 @@
 package cloud.pposiraegi.ecommerce.domain.user.user.dto;
 
-import cloud.pposiraegi.ecommerce.domain.user.user.entity.UserAddressEntity;
+import cloud.pposiraegi.ecommerce.domain.user.user.entity.UserAddress;
 import cloud.pposiraegi.ecommerce.global.common.validator.ValidPhoneNumber;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -33,7 +33,7 @@ public class UserAddressDto {
             Boolean isDefault,
             LocalDateTime lastUsedAt
     ) {
-        public static Response from(UserAddressEntity address) {
+        public static Response from(UserAddress address) {
             return new Response(
                     address.getId().toString(),
                     address.getRecipientName(),

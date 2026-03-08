@@ -2,7 +2,7 @@ package cloud.pposiraegi.ecommerce.domain.user.user.service;
 
 import cloud.pposiraegi.ecommerce.domain.common.PhoneNumber;
 import cloud.pposiraegi.ecommerce.domain.user.user.dto.UserAddressDto;
-import cloud.pposiraegi.ecommerce.domain.user.user.entity.UserAddressEntity;
+import cloud.pposiraegi.ecommerce.domain.user.user.entity.UserAddress;
 import cloud.pposiraegi.ecommerce.domain.user.user.repository.UserAddressRepository;
 import cloud.pposiraegi.ecommerce.global.common.exception.BusinessException;
 import cloud.pposiraegi.ecommerce.global.common.exception.ErrorCode;
@@ -34,7 +34,7 @@ public class UserAddressService {
         PhoneNumber secondaryPhone = StringUtils.hasText(request.secondaryPhoneNumber())
                 ? new PhoneNumber(request.secondaryPhoneNumber()) : null;
 
-        UserAddressEntity userAddress = UserAddressEntity.builder()
+        UserAddress userAddress = UserAddress.builder()
                 .id(Tsid)
                 .userId(userId)
                 .recipientName(request.recipientName())
@@ -51,7 +51,7 @@ public class UserAddressService {
     }
 
     public List<UserAddressDto.Response> getAllAddresses(Long userId) {
-        List<UserAddressEntity> userAddresses = userAddressRepository.findAllByUserId(userId);
+        List<UserAddress> userAddresses = userAddressRepository.findAllByUserId(userId);
 
         return userAddresses.stream()
                 .map(UserAddressDto.Response::from)
@@ -60,7 +60,7 @@ public class UserAddressService {
 
     @Transactional
     public void updateAddress(Long userId, Long addressId, UserAddressDto.Request request) {
-        UserAddressEntity userAddress = userAddressRepository.findByIdAndUserId(addressId, userId)
+        UserAddress userAddress = userAddressRepository.findByIdAndUserId(addressId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ADDRESS_NOT_FOUND));
 
         boolean isRequestDefault = Boolean.TRUE.equals(request.isDefault());
@@ -90,7 +90,7 @@ public class UserAddressService {
 
     @Transactional
     public void deleteAddress(Long userId, Long addressId) {
-        UserAddressEntity userAddress = userAddressRepository.findByIdAndUserId(addressId, userId)
+        UserAddress userAddress = userAddressRepository.findByIdAndUserId(addressId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ADDRESS_NOT_FOUND));
 
         if (userAddress.getIsDefault()) {

@@ -1,4 +1,4 @@
-package cloud.pposiraegi.ecommerce.domain.user.user.entity;
+package cloud.pposiraegi.ecommerce.domain.user.user.enums;
 
 public enum UserStatus {
     // 이메일 인증 전 (임시 계정)

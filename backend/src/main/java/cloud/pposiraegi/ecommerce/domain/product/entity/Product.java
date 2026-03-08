@@ -1,10 +1,7 @@
 package cloud.pposiraegi.ecommerce.domain.product.entity;
 
 import cloud.pposiraegi.ecommerce.domain.product.enums.ProductStatus;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -47,6 +44,7 @@ public class Product {
     @Column(name = "sale_price", nullable = false)
     private Integer salePrice;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private ProductStatus status = ProductStatus.PREPARING;
 
