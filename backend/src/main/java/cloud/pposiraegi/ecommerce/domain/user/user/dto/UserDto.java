@@ -1,6 +1,6 @@
 package cloud.pposiraegi.ecommerce.domain.user.user.dto;
 
-import cloud.pposiraegi.ecommerce.domain.user.user.entity.UserEntity;
+import cloud.pposiraegi.ecommerce.domain.user.user.entity.User;
 import cloud.pposiraegi.ecommerce.global.common.validator.ValidPhoneNumber;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -21,7 +21,7 @@ public class UserDto {
             String nickname,
             String profileImageUrl
     ) {
-        public static SimpleResponse from(UserEntity user) {
+        public static SimpleResponse from(User user) {
             return new SimpleResponse(
                     user.getId(),
                     user.getNickname(),

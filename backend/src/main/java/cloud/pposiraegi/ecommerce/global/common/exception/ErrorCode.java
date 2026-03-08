@@ -41,6 +41,15 @@ public enum ErrorCode {
     OUT_OF_STOCK(HttpStatus.BAD_REQUEST, "P002", "재고가 부족합니다."),
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "P003", "리뷰를 찾을 수 없습니다."),
 
+    // 타임딜 (T)
+    TIMEDEAL_NOT_FOUND(HttpStatus.NOT_FOUND, "T001", "타임딜 정보를 찾을 수 없습니다."),
+    TIMEDEAL_NOT_ACTIVE(HttpStatus.BAD_REQUEST, "T002", "현재 구매 가능한 타임딜 시간이 아닙니다."),
+    INVALID_TIMEDEAL_START_STATE(HttpStatus.BAD_REQUEST, "T003", "대기 중인 타임딜만 시작할 수 있습니다."),
+    INVALID_TIMEDEAL_END_STATE(HttpStatus.BAD_REQUEST, "T004", "진행 중인 타임딜만 종료할 수 있습니다."),
+    TIMEDEAL_ALREADY_EXPIRED(HttpStatus.BAD_REQUEST, "T005", "이미 종료된 타임딜입니다."),
+    INVALID_TIMEDEAL_TIME_RANGE(HttpStatus.BAD_REQUEST, "T006", "종료 시간은 시작 시간보다 앞설 수 없습니다."),
+    INVALID_TIMEDEAL_START_TIME(HttpStatus.BAD_REQUEST, "T007", "시작 시간은 현재 시간보다 과거일 수 없습니다."),
+
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "O001", "주문 내역을 찾을 수 없습니다."),
     CHECKOUT_NOT_FOUND(HttpStatus.NOT_FOUND, "O002", "존재하지 않거나 이미 만료된 주문서입니다."),
     CHECKOUT_USER_MISMATCH(HttpStatus.FORBIDDEN, "O003", "주문서의 소유자가 일치하지 않습니다."),

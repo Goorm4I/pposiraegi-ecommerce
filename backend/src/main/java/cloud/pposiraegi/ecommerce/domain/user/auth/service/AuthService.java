@@ -3,8 +3,8 @@ package cloud.pposiraegi.ecommerce.domain.user.auth.service;
 import cloud.pposiraegi.ecommerce.domain.user.auth.dto.AuthDto;
 import cloud.pposiraegi.ecommerce.domain.user.auth.entity.UserRefreshTokenEntity;
 import cloud.pposiraegi.ecommerce.domain.user.auth.repository.UserRefreshTokenRepository;
-import cloud.pposiraegi.ecommerce.domain.user.user.entity.UserEntity;
-import cloud.pposiraegi.ecommerce.domain.user.user.entity.UserStatus;
+import cloud.pposiraegi.ecommerce.domain.user.user.entity.User;
+import cloud.pposiraegi.ecommerce.domain.user.user.enums.UserStatus;
 import cloud.pposiraegi.ecommerce.domain.user.user.repository.UserRepository;
 import cloud.pposiraegi.ecommerce.global.auth.jwt.TokenProvider;
 import cloud.pposiraegi.ecommerce.global.common.exception.BusinessException;
@@ -39,7 +39,7 @@ public class AuthService {
     @Transactional
     public AuthDto.LoginResponse login(AuthDto.LoginRequest request, String ipAddress, String deviceInfo) {
         // 1. 유저 존재 여부 확인
-        UserEntity user = userRepository.findByEmail(request.email())
+        User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BusinessException(ErrorCode.LOGIN_FAILED));
 
         // 2. 유저 상태 확인

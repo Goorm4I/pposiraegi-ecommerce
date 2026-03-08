@@ -2,10 +2,7 @@ package cloud.pposiraegi.ecommerce.domain.product.entity;
 
 import cloud.pposiraegi.ecommerce.domain.product.enums.ImageType;
 import cloud.pposiraegi.ecommerce.global.common.entity.BaseUpdatedEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -26,6 +23,7 @@ public class ProductImage extends BaseUpdatedEntity {
     @Column(name = "image_url", nullable = false, columnDefinition = "TEXT")
     private String imageUrl;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "image_type", length = 20)
     private ImageType imageType; // 예: MAIN, DETAIL
 
