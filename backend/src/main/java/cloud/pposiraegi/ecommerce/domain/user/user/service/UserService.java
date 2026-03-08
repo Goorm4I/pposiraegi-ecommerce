@@ -2,7 +2,7 @@ package cloud.pposiraegi.ecommerce.domain.user.user.service;
 
 import cloud.pposiraegi.ecommerce.domain.common.PhoneNumber;
 import cloud.pposiraegi.ecommerce.domain.user.user.dto.UserDto;
-import cloud.pposiraegi.ecommerce.domain.user.user.entity.UserEntity;
+import cloud.pposiraegi.ecommerce.domain.user.user.entity.User;
 import cloud.pposiraegi.ecommerce.domain.user.user.repository.UserRepository;
 import cloud.pposiraegi.ecommerce.global.common.exception.BusinessException;
 import cloud.pposiraegi.ecommerce.global.common.exception.ErrorCode;
@@ -33,7 +33,7 @@ public class UserService {
 
 
         // 3. 엔티티 생성 및 저장
-        UserEntity user = UserEntity.builder()
+        User user = User.builder()
                 .id(tsid)
                 .email(request.email())
                 .passwordHash(encodedPassword)
@@ -42,14 +42,14 @@ public class UserService {
                 .phoneNumber(new PhoneNumber(request.phoneNumber()))
                 .build();
 
-        UserEntity savedUser = userRepository.save(user);
+        User savedUser = userRepository.save(user);
 
         return UserDto.SimpleResponse.from(savedUser);
     }
 
     @Transactional(readOnly = true)
     public UserDto.SimpleResponse getUser(Long userId) {
-        UserEntity user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         return UserDto.SimpleResponse.from(user);
     }
 

@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "user_addresses")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class UserAddressEntity extends BaseUpdatedEntity {
+public class UserAddress extends BaseUpdatedEntity {
     @Id
     private Long id;
 
@@ -56,7 +56,7 @@ public class UserAddressEntity extends BaseUpdatedEntity {
     private LocalDateTime lastUsedAt;
 
     @Builder
-    public UserAddressEntity(Long id, Long userId, String recipientName, PhoneNumber phoneNumber, PhoneNumber secondaryPhoneNumber, String zipCode, String baseAddress, String detailAddress, String requestMessage, Boolean isDefault) {
+    public UserAddress(Long id, Long userId, String recipientName, PhoneNumber phoneNumber, PhoneNumber secondaryPhoneNumber, String zipCode, String baseAddress, String detailAddress, String requestMessage, Boolean isDefault) {
         this.id = id;
         this.userId = userId;
         this.recipientName = recipientName;
