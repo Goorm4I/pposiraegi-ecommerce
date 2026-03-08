@@ -38,6 +38,15 @@ public enum ErrorCode {
     OUT_OF_STOCK(HttpStatus.BAD_REQUEST, "P002", "재고가 부족합니다."),
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "P003", "리뷰를 찾을 수 없습니다."),
 
+    // 타임딜 (T)
+    TIMEDEAL_NOT_FOUND(HttpStatus.NOT_FOUND, "T001", "타임딜 정보를 찾을 수 없습니다."),
+    TIMEDEAL_NOT_ACTIVE(HttpStatus.BAD_REQUEST, "T002", "현재 구매 가능한 타임딜 시간이 아닙니다."),
+    INVALID_TIMEDEAL_START_STATE(HttpStatus.BAD_REQUEST, "T003", "대기 중인 타임딜만 시작할 수 있습니다."),
+    INVALID_TIMEDEAL_END_STATE(HttpStatus.BAD_REQUEST, "T004", "진행 중인 타임딜만 종료할 수 있습니다."),
+    TIMEDEAL_ALREADY_EXPIRED(HttpStatus.BAD_REQUEST, "T005", "이미 종료된 타임딜입니다."),
+    INVALID_TIMEDEAL_TIME_RANGE(HttpStatus.BAD_REQUEST, "T006", "종료 시간은 시작 시간보다 앞설 수 없습니다."),
+    INVALID_TIMEDEAL_START_TIME(HttpStatus.BAD_REQUEST, "T007", "시작 시간은 현재 시간보다 과거일 수 없습니다."),
+
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "O001", "주문 내역을 찾을 수 없습니다."),
 
     COUPON_EXPIRED(HttpStatus.BAD_REQUEST, "M001", "만료된 쿠폰입니다.");
@@ -58,7 +67,7 @@ public enum ErrorCode {
 //OUT_OF_STOCK(HttpStatus.BAD_REQUEST, "P002", "재고가 부족합니다."),
 //REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "P003", "리뷰를 찾을 수 없습니다."),
 //
-//// [추가된 상품/SKU 관련 에러 코드]
+/// / [추가된 상품/SKU 관련 에러 코드]
 //SKU_NOT_FOUND(HttpStatus.NOT_FOUND, "P015", "요청한 상품 옵션(SKU)을 찾을 수 없습니다."),
 //DUPLICATE_SKU_CODE(HttpStatus.BAD_REQUEST, "P016", "이미 등록된 SKU 코드입니다."),
 //INVALID_STOCK_QUANTITY(HttpStatus.BAD_REQUEST, "P017", "재고 수량은 0 이상이어야 합니다."),
