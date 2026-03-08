@@ -38,7 +38,7 @@ public class ProductService {
     }
 
     @Transactional
-    public void createProduct(ProductDto.ProductCreateRequest request) {
+    public Long createProduct(ProductDto.ProductCreateRequest request) {
         Product product = Product.builder()
                 .id(tsidFactory.create().toLong())
                 .categoryId(request.categoryId())
@@ -79,7 +79,7 @@ public class ProductService {
                     .build();
 
             productSkuRepository.save(defaultSku);
-            return;
+            return product.getId();
         }
 
         List<Map<String, Long>> optionValueMaps = new ArrayList<>();
@@ -154,6 +154,8 @@ public class ProductService {
 
         productSkuRepository.saveAll(skusToSave);
         skuOptionMappingRepository.saveAll(skuOptionMappingsToSave);
+
+        return product.getId();
     }
 
     @Transactional(readOnly = true)
