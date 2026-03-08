@@ -1,6 +1,6 @@
 package cloud.pposiraegi.ecommerce.domain.user.user.service;
 
-import cloud.pposiraegi.ecommerce.domain.user.user.entity.UserAddressEntity;
+import cloud.pposiraegi.ecommerce.domain.user.user.entity.UserAddress;
 import cloud.pposiraegi.ecommerce.domain.user.user.repository.UserAddressRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +24,7 @@ public class UserAddressQueryService {
             String detailAddress,
             String requestMessage
     ) {
-        public static AddressInfo from(UserAddressEntity address) {
+        public static AddressInfo from(UserAddress address) {
             return new AddressInfo(
                     address.getId(),
                     address.getRecipientName(),
