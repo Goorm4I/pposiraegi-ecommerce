@@ -17,7 +17,7 @@ public class TimeDealTestController {
 
     @PostMapping("/{id}/purchase")
     public ApiResponse<String> testDeductStock(@PathVariable Long id) {
-        timeDealService.decreaseStock(id);
+        timeDealService.decreaseStock(id, 1);
         return ApiResponse.success(null);
     }
 }

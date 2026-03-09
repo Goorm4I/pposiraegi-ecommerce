@@ -45,19 +45,19 @@ public class TimeDealService {
     }
 
     @Transactional(readOnly = true)
-    public List<TimeDealDto.Response> getAdminTimeDeals(TimeDealStatus status) {
+    public List<TimeDealDto.TimeDealResponse> getAdminTimeDeals(TimeDealStatus status) {
         List<Object[]> results = timeDealRepository.findTimeDealsWithProducts(status);
 
         return results.stream().map(result -> {
             TimeDeal timeDeal = (TimeDeal) result[0];
             Product product = (Product) result[1];
 
-            return TimeDealDto.Response.from(timeDeal, ProductDto.ProductResponse.from(product));
+            return TimeDealDto.TimeDealResponse.from(timeDeal, ProductDto.ProductResponse.from(product));
         }).toList();
     }
 
     @Transactional(readOnly = true)
-    public List<TimeDealDto.Response> getPublicTimeDeals(TimeDealStatus status) {
+    public List<TimeDealDto.TimeDealResponse> getPublicTimeDeals(TimeDealStatus status) {
         if (status == TimeDealStatus.SUSPENDED) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
@@ -74,15 +74,29 @@ public class TimeDealService {
             TimeDeal timeDeal = (TimeDeal) result[0];
             Product product = (Product) result[1];
 
-            return TimeDealDto.Response.from(timeDeal, ProductDto.ProductResponse.from(product));
+            return TimeDealDto.TimeDealResponse.from(timeDeal, ProductDto.ProductResponse.from(product));
         }).toList();
     }
 
-    @Transactional
-    public void decreaseStock(Long id) {
+    @Transactional(readOnly = true)
+    public TimeDealDto.TimeDealDetailResponse getTimeDeal(Long id) {
         TimeDeal timeDeal = timeDealRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TIMEDEAL_NOT_FOUND));
 
-        timeDeal.decreaseQuantity(1);
+        if (TimeDealStatus.SUSPENDED.equals(timeDeal.getStatus())) {
+            throw new BusinessException(ErrorCode.HANDLE_ACCESS_DENIED);
+        }
+
+        return TimeDealDto.TimeDealDetailResponse.from(timeDeal, productService.getProductDetail(timeDeal.getProductId()));
     }
+
+    @Transactional
+    public void decreaseStock(Long id, Integer amount) {
+        TimeDeal timeDeal = timeDealRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TIMEDEAL_NOT_FOUND));
+
+        timeDeal.decreaseQuantity(amount);
+    }
+
+
 }

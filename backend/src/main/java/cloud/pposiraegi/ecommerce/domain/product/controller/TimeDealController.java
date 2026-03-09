@@ -5,10 +5,7 @@ import cloud.pposiraegi.ecommerce.domain.product.enums.TimeDealStatus;
 import cloud.pposiraegi.ecommerce.domain.product.service.TimeDealService;
 import cloud.pposiraegi.ecommerce.global.common.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -19,7 +16,12 @@ public class TimeDealController {
     private final TimeDealService timeDealService;
 
     @GetMapping
-    public ApiResponse<List<TimeDealDto.Response>> getPublicTimeDeals(@RequestParam(required = false) TimeDealStatus status) {
+    public ApiResponse<List<TimeDealDto.TimeDealResponse>> getPublicTimeDeals(@RequestParam(required = false) TimeDealStatus status) {
         return ApiResponse.success(timeDealService.getPublicTimeDeals(status));
+    }
+
+    @GetMapping("/{id}")
+    public ApiResponse<TimeDealDto.TimeDealDetailResponse> getTimeDeal(@PathVariable Long id) {
+        return ApiResponse.success(timeDealService.getTimeDeal(id));
     }
 }
