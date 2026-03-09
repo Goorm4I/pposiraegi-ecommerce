@@ -10,6 +10,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -31,8 +32,8 @@ public class ProductSku extends BaseUpdatedEntity {
     @Column(nullable = false, length = 20)
     private SkuStatus status;
 
-    @Column(name = "additional_price", columnDefinition = "INT DEFAULT 0")
-    private Integer additionalPrice;
+    @Column(name = "additional_price", precision = 12, scale = 2)
+    private BigDecimal additionalPrice = BigDecimal.ZERO;
 
     @Column(name = "stock_quantity", nullable = false, columnDefinition = "INT DEFAULT 0")
     private Integer stockQuantity;
@@ -44,13 +45,13 @@ public class ProductSku extends BaseUpdatedEntity {
     private LocalDateTime deletedAt; // 논리 삭제(Soft Delete) 용도
 
     @Builder
-    public ProductSku(Long id, Long productId, String skuCode, String combinationKey, SkuStatus status, Integer additionalPrice, Integer stockQuantity) {
+    public ProductSku(Long id, Long productId, String skuCode, String combinationKey, SkuStatus status, BigDecimal additionalPrice, Integer stockQuantity) {
         this.id = id;
         this.productId = productId;
         this.skuCode = skuCode;
         this.combinationKey = combinationKey;
         this.status = status != null ? status : SkuStatus.OUT_OF_STOCK;
-        this.additionalPrice = additionalPrice != null ? additionalPrice : 0;
+        this.additionalPrice = additionalPrice != null ? additionalPrice : BigDecimal.ZERO;
         this.stockQuantity = stockQuantity != null ? stockQuantity : 0;
     }
 
@@ -78,7 +79,7 @@ public class ProductSku extends BaseUpdatedEntity {
         }
     }
 
-    public void updateInfo(Integer additionalPrice, SkuStatus status) {
+    public void updateInfo(BigDecimal additionalPrice, SkuStatus status) {
         if (additionalPrice != null) {
             this.additionalPrice = additionalPrice;
         }

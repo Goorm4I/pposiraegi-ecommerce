@@ -1,0 +1,15 @@
+package cloud.pposiraegi.ecommerce.domain.order.enums;
+
+public enum OrderItemStatus {
+    PROCESSING, PAID,
+
+    PREPARING, SHIPPING, DELIVERED,
+
+    CANCELED,
+
+    REFUND_REQUESTED, REFUNDED,
+
+    EXCHANGE_REQUESTED, EXCHANGE_PICKING, EXCHANGE_RECEIVED, EXCHANGE_SHIPPING,
+
+    PURCHASE_CONFIRMED
+}

@@ -11,6 +11,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public class ProductDto {
@@ -19,9 +20,9 @@ public class ProductDto {
             @NotBlank String name,
             String description,
             String brandName,
-            @NotNull @Min(0) Integer originPrice,
+            @NotNull @Min(0) BigDecimal originPrice,
             // 판매가격이 정가보다 높지 못하게 검증
-            @Min(0) Integer salePrice,
+            @Min(0) BigDecimal salePrice,
             @NotNull ProductStatus status,
 
             @Valid List<ImageRequest> images,
@@ -46,7 +47,7 @@ public class ProductDto {
     public record SkuRequest(
             String skuCode,
             @NotNull SkuStatus status,
-            @Min(0) Integer additionalPrice,
+            @Min(0) BigDecimal additionalPrice,
             @Min(0) Integer stockQuantity,
             @NotNull List<String> selectedOptionValues
     ) {
@@ -57,8 +58,8 @@ public class ProductDto {
             String name,
             String description,
             String brandName,
-            Integer originPrice,
-            Integer salePrice,
+            String originPrice,
+            String salePrice,
             String thumbnailUrl,
             String averageRating,
             Integer reviewCount,
@@ -71,8 +72,8 @@ public class ProductDto {
                     product.getName(),
                     product.getDescription(),
                     product.getBrandName(),
-                    product.getOriginPrice(),
-                    product.getSalePrice(),
+                    product.getOriginPrice().toString(),
+                    product.getSalePrice().toString(),
                     product.getThumbnailUrl(),
                     product.getAverageRating().toString(),
                     product.getReviewCount(),
@@ -117,19 +118,19 @@ public class ProductDto {
     }
 
     public record SkuResponse(
-            Long skuId,
+            String skuId,
             String skuCode,
-            Integer additionalPrice,
-            Integer stockQuantity,
+            String additionalPrice,
+            String stockQuantity,
             String status,
             List<Long> optionValueIds
     ) {
         public static SkuResponse from(ProductSku sku, List<Long> optionValueIds) {
             return new SkuResponse(
-                    sku.getId(),
+                    sku.getId().toString(),
                     sku.getSkuCode(),
-                    sku.getAdditionalPrice(),
-                    sku.getStockQuantity(),
+                    sku.getAdditionalPrice().toString(),
+                    sku.getStockQuantity().toString(),
                     sku.getStatus().name(),
                     optionValueIds
             );

@@ -13,6 +13,24 @@ spring:
         format_sql: true
         use_sql_comments: true
 
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:
+      database: 0
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 2
+
+    # 스프링 부트 4.0 성능 최적화: 가상 스레드 활성화
+  threads:
+    virtual:
+      enabled: true
+
 logging:
   level:
     cloud.pposiraegi.ecommerce: DEBUG
@@ -25,3 +43,4 @@ jwt:
 
 storage:
   location: C:/tmp/pposiraegi/uploads/images
+

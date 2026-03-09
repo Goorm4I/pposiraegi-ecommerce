@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -74,7 +75,7 @@ public class ProductService {
                     .skuCode(request.skus().getFirst().skuCode())
                     .combinationKey("")
                     .status(request.skus().getFirst().status())
-                    .additionalPrice(0)
+                    .additionalPrice(BigDecimal.ZERO)
                     .stockQuantity(request.skus().getFirst().stockQuantity())
                     .build();
 
@@ -201,6 +202,14 @@ public class ProductService {
                 }).toList();
 
         return ProductDto.ProductDetailResponse.from(product, images, optionGroups, skus);
+    }
+
+    @Transactional
+    public void decreaseStock(Long skuId, int quantity) {
+        ProductSku sku = productSkuRepository.findById(skuId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SKU_NOT_FOUND));
+
+        sku.removeStock(quantity);
     }
 
 }
