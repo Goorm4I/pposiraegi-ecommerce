@@ -54,6 +54,10 @@ dependencies {
 
     // Swagger
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2'
+
+    // Redis & Redisson for TimeDeal Stock Concurrency
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.redisson:redisson-spring-boot-starter:3.27.2'
 }
 
 tasks.named('test') {
