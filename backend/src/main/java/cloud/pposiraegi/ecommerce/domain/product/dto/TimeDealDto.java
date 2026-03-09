@@ -30,6 +30,8 @@ public class TimeDealDto {
             LocalDateTime startTime,
             LocalDateTime endTime,
             String status,
+            Integer dealQuantity,
+            Integer remainingQuantity,
             ProductDto.ProductResponse product
     ) {
         public static Response from(TimeDeal timeDeal, ProductDto.ProductResponse product) {
@@ -39,6 +41,8 @@ public class TimeDealDto {
                     timeDeal.getStartTime(),
                     timeDeal.getEndTime(),
                     timeDeal.getStatus().toString(),
+                    timeDeal.getTotalQuantity(),
+                    timeDeal.getRemainQuantity(),
                     product
             );
         }
