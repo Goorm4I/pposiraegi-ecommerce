@@ -48,6 +48,10 @@ public class Product {
     @Column(name = "status", nullable = false)
     private ProductStatus status = ProductStatus.PREPARING;
 
+    public void updateThumbnailUrl(String thumbnailUrl) {
+        this.thumbnailUrl = thumbnailUrl;
+    }
+
     @Builder
     public Product(Long id, Long categoryId, String name, String description, String brandName, BigDecimal originPrice, BigDecimal salePrice, ProductStatus status) {
         this.id = id;

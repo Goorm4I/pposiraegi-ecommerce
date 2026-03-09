@@ -3,6 +3,7 @@ package cloud.pposiraegi.ecommerce.domain.product.service;
 import cloud.pposiraegi.ecommerce.domain.product.dto.ImageDto;
 import cloud.pposiraegi.ecommerce.domain.product.dto.ProductDto;
 import cloud.pposiraegi.ecommerce.domain.product.entity.*;
+import cloud.pposiraegi.ecommerce.domain.product.enums.ImageType;
 import cloud.pposiraegi.ecommerce.domain.product.repository.*;
 import cloud.pposiraegi.ecommerce.global.common.exception.BusinessException;
 import cloud.pposiraegi.ecommerce.global.common.exception.ErrorCode;
@@ -51,10 +52,18 @@ public class ProductService {
                 .status(request.status())
                 .build();
 
+        // THUMBNAIL 이미지 URL을 save 전에 세팅 (persist 전 설정으로 INSERT 시 반영)
+        if (request.images() != null && !request.images().isEmpty()) {
+            request.images().stream()
+                    .filter(img -> img.imageType() == ImageType.THUMBNAIL)
+                    .findFirst()
+                    .ifPresent(thumb -> product.updateThumbnailUrl(thumb.imageUrl()));
+        }
+
         productRepository.save(product);
 
-        // 썸네일 이미지를 등록?
-        if (request.images() != null) {
+        // 이미지 저장
+        if (request.images() != null && !request.images().isEmpty()) {
             List<ProductImage> productImages = request.images().stream()
                     .map(image -> ProductImage.builder()
                             .id(tsidFactory.create().toLong())
@@ -64,7 +73,6 @@ public class ProductService {
                             .displayOrder(image.displayOrder())
                             .build())
                     .toList();
-
             productImageRepository.saveAll(productImages);
         }
 
