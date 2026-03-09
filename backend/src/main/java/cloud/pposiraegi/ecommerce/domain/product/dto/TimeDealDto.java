@@ -24,22 +24,42 @@ public class TimeDealDto {
     ) {
     }
 
-    public record Response(
-            String id,
+    public record TimeDealResponse(
+            String timeDealId,
             String productId,
             LocalDateTime startTime,
             LocalDateTime endTime,
             String status,
             ProductDto.ProductResponse product
     ) {
-        public static Response from(TimeDeal timeDeal, ProductDto.ProductResponse product) {
-            return new Response(
+        public static TimeDealResponse from(TimeDeal timeDeal, ProductDto.ProductResponse product) {
+            return new TimeDealResponse(
                     timeDeal.getId().toString(),
                     timeDeal.getProductId().toString(),
                     timeDeal.getStartTime(),
                     timeDeal.getEndTime(),
                     timeDeal.getStatus().toString(),
                     product
+            );
+        }
+    }
+
+    public record TimeDealDetailResponse(
+            String timeDealId,
+            String productId,
+            String startTime,
+            String endTime,
+            String status,
+            ProductDto.ProductDetailResponse product
+    ) {
+        public static TimeDealDetailResponse from(TimeDeal timeDeal, ProductDto.ProductDetailResponse productDetail) {
+            return new TimeDealDetailResponse(
+                    timeDeal.getId().toString(),
+                    timeDeal.getProductId().toString(),
+                    timeDeal.getStartTime().toString(),
+                    timeDeal.getEndTime().toString(),
+                    timeDeal.getStatus().toString(),
+                    productDetail
             );
         }
     }

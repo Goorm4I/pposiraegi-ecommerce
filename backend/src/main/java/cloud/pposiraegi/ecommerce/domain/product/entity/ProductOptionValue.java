@@ -22,7 +22,7 @@ public class ProductOptionValue extends BaseUpdatedEntity {
     @Column(name = "option_id", nullable = false)
     private Long optionId;
 
-    @Column(nullable = false, length = 50)
+    @Column(name = "value", nullable = false, length = 50)
     private String value;
 
     @Column(name = "display_order")
