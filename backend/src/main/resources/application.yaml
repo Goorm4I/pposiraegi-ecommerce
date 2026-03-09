@@ -10,7 +10,7 @@ spring:
       hibernate:
         default_batch_fetch_size: 100 # N+1 Problem
 
-
-app:
-  jwt:
-    expiration-ms: 1h
+cors:
+  allowed-origins:
+    - "http://localhost:3000"
+    - "https://pposiraegi.cloud"
