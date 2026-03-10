@@ -6,11 +6,14 @@ import org.redisson.client.RedisNoScriptException;
 import org.redisson.client.codec.StringCodec;
 import org.springframework.stereotype.Repository;
 
-import java.util.Collections;
+import java.util.Arrays;
+import java.util.List;
 
 @Repository
 public class RedisStockRepository {
     public static final Long OUT_OF_STOCK_CODE = -1L;
+    public static final String STOCK_KEY_PREFIX = "stock:sku:";
+    public static final String DIRTY_SKU_KEY = "stock:dirty:sku";
 
     private final RedissonClient redissonClient;
     private final RScript script;
@@ -24,8 +27,9 @@ public class RedisStockRepository {
             local current = tonumber(stock)
             local amount = tonumber(ARGV[1])
             if current >= amount then
-                redis.call('decrby', KEYS[1], amount)
-                return current - amount
+                local remain = redis.call('decrby', KEYS[1], amount)
+                redis.call('sadd', KEYS[2], ARGV[2])
+                return remain
             end
             return -1
             """;
@@ -33,7 +37,9 @@ public class RedisStockRepository {
     private static final String INCREASE_SCRIPT = """
             local stock = redis.call('get', KEYS[1])
             if stock == false then return nil end
-            return redis.call('incrby', KEYS[1], tonumber(ARGV[1]))
+            local current = redis.call('incrby', KEYS[1], tonumber(ARGV[1]))
+            redis.call('sadd', KEYS[2], ARGV[2])
+            return current
             """;
 
     public RedisStockRepository(RedissonClient redissonClient) {
@@ -48,39 +54,44 @@ public class RedisStockRepository {
     }
 
 
-    public void setStock(String key, int quantity) {
-        redissonClient.getAtomicLong(key).set(quantity);
+    public void setStock(Long skuId, int quantity) {
+        String stockKey = STOCK_KEY_PREFIX + skuId;
+        redissonClient.getAtomicLong(stockKey).set(quantity);
     }
 
-    public Long decreaseAtomic(String key, int quantity) {
+    public Long decreaseAtomic(Long skuId, int quantity) {
+        String stockKey = STOCK_KEY_PREFIX + skuId;
+        List<Object> keys = Arrays.asList(stockKey, DIRTY_SKU_KEY);
         try {
             return script.evalSha(
                     RScript.Mode.READ_WRITE,
                     decreaseSha,
                     RScript.ReturnType.LONG,
-                    Collections.singletonList(key),
-                    String.valueOf(quantity)
+                    keys,
+                    String.valueOf(quantity), String.valueOf(skuId)
             );
-        } catch (org.redisson.client.RedisNoScriptException e) {
+        } catch (RedisNoScriptException e) {
             loadScripts();
             return script.evalSha(
                     RScript.Mode.READ_WRITE,
                     decreaseSha,
                     RScript.ReturnType.LONG,
-                    Collections.singletonList(key),
-                    String.valueOf(quantity)
+                    keys,
+                    String.valueOf(quantity), String.valueOf(skuId)
             );
         }
     }
 
-    public Long increaseAtomic(String key, int quantity) {
+    public Long increaseAtomic(Long skuId, int quantity) {
+        String stockKey = STOCK_KEY_PREFIX + skuId;
+        List<Object> keys = Arrays.asList(stockKey, DIRTY_SKU_KEY);
         try {
             return script.evalSha(
                     RScript.Mode.READ_WRITE,
                     increaseSha,
                     RScript.ReturnType.LONG,
-                    Collections.singletonList(key),
-                    String.valueOf(quantity)
+                    keys,
+                    String.valueOf(quantity), String.valueOf(skuId)
             );
         } catch (RedisNoScriptException e) {
             loadScripts();
@@ -88,8 +99,8 @@ public class RedisStockRepository {
                     RScript.Mode.READ_WRITE,
                     increaseSha,
                     RScript.ReturnType.LONG,
-                    Collections.singletonList(key),
-                    String.valueOf(quantity)
+                    keys,
+                    String.valueOf(quantity), String.valueOf(skuId)
             );
         }
     }

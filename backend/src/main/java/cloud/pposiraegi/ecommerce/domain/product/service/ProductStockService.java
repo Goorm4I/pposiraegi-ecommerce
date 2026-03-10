@@ -22,9 +22,7 @@ public class ProductStockService {
     private final RedisStockRepository redisStockRepository;
 
     public void decreaseStock(Long skuId, int quantity) {
-        String stockKey = "stock:sku:" + skuId;
-
-        Long decreaseResult = redisStockRepository.decreaseAtomic(stockKey, quantity);
+        Long decreaseResult = redisStockRepository.decreaseAtomic(skuId, quantity);
 
         if (decreaseResult != null) {
             if (decreaseResult.equals(RedisStockRepository.OUT_OF_STOCK_CODE)) {
@@ -42,7 +40,7 @@ public class ProductStockService {
                 throw new BusinessException(ErrorCode.CONCURRENCY_CONFLICT);
             }
 
-            Long retryResult = redisStockRepository.decreaseAtomic(stockKey, quantity);
+            Long retryResult = redisStockRepository.decreaseAtomic(skuId, quantity);
             if (retryResult != null) {
                 if (retryResult.equals(RedisStockRepository.OUT_OF_STOCK_CODE)) {
                     throw new BusinessException(ErrorCode.OUT_OF_STOCK);
@@ -50,8 +48,8 @@ public class ProductStockService {
                 return;
             }
 
-            loadStockFromDB(skuId, stockKey);
-            Long finalResult = redisStockRepository.decreaseAtomic(stockKey, quantity);
+            loadStockFromDB(skuId);
+            Long finalResult = redisStockRepository.decreaseAtomic(skuId, quantity);
             if (finalResult.equals(RedisStockRepository.OUT_OF_STOCK_CODE)) {
                 throw new BusinessException(ErrorCode.OUT_OF_STOCK);
             }
@@ -67,9 +65,7 @@ public class ProductStockService {
     }
 
     public void restoreStock(Long skuId, int quantity) {
-        String stockKey = "stock:sku:" + skuId;
-
-        Long increaseResult = redisStockRepository.increaseAtomic(stockKey, quantity);
+        Long increaseResult = redisStockRepository.increaseAtomic(skuId, quantity);
         if (increaseResult != null) {
             return;
         }
@@ -83,13 +79,13 @@ public class ProductStockService {
                 throw new BusinessException(ErrorCode.CONCURRENCY_CONFLICT);
             }
 
-            Long retryResult = redisStockRepository.increaseAtomic(stockKey, quantity);
+            Long retryResult = redisStockRepository.increaseAtomic(skuId, quantity);
             if (retryResult != null) {
                 return;
             }
 
-            loadStockFromDB(skuId, stockKey);
-            redisStockRepository.increaseAtomic(stockKey, quantity);
+            loadStockFromDB(skuId);
+            redisStockRepository.increaseAtomic(skuId, quantity);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("락 획득 대기 중 오류가 발생했습니다.");
@@ -100,9 +96,9 @@ public class ProductStockService {
         }
     }
 
-    private void loadStockFromDB(Long skuId, String stockKey) {
+    private void loadStockFromDB(Long skuId) {
         ProductSku productSku = productSkuRepository.findById(skuId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.SKU_NOT_FOUND));
-        redisStockRepository.setStock(stockKey, productSku.getStockQuantity());
+        redisStockRepository.setStock(skuId, productSku.getStockQuantity());
     }
 }

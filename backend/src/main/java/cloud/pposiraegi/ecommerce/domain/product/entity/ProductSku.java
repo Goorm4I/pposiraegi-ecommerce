@@ -93,4 +93,9 @@ public class ProductSku extends BaseUpdatedEntity {
         this.status = SkuStatus.DISCONTINUED;
     }
 
+    public void updateStock(Integer currentStock) {
+        if (currentStock != null) {
+            this.stockQuantity = currentStock;
+        }
+    }
 }
