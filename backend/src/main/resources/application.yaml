@@ -38,6 +38,12 @@ spring:
     virtual:
       enabled: true
 
+  task:
+    scheduling:
+      pool:
+        size: 5
+      thread-name-prefix: scheduler-
+
 jwt:
   secret: ${JWT_SECRET:iqe7Fa7xrhXwJ5SLoee88Yg7DeUuJflj4+IE/XIl81tmZ24qNd4tCUble1Zk2drO=}
   access-token-validity-in-milliseconds: 3600000

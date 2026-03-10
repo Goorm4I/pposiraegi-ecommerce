@@ -59,6 +59,15 @@ public class RedisStockRepository {
         redissonClient.getAtomicLong(stockKey).set(quantity);
     }
 
+    public boolean setStockIfNotExists(Long skuId, int quantity) {
+        String stockKey = STOCK_KEY_PREFIX + skuId;
+        if (!redissonClient.getAtomicLong(stockKey).isExists()) {
+            redissonClient.getAtomicLong(stockKey).set(quantity);
+            return true;
+        }
+        return false;
+    }
+
     public Long decreaseAtomic(Long skuId, int quantity) {
         String stockKey = STOCK_KEY_PREFIX + skuId;
         List<Object> keys = Arrays.asList(stockKey, DIRTY_SKU_KEY);
