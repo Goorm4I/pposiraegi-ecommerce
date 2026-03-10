@@ -16,6 +16,8 @@ public interface TimeDealRepository extends JpaRepository<TimeDeal, Long> {
 
     List<TimeDeal> findByStatus(TimeDealStatus status);
 
+    List<TimeDeal> findByStatusAndStartTimeBetween(TimeDealStatus status, LocalDateTime start, LocalDateTime end);
+
     @Query("SELECT t, p FROM TimeDeal t JOIN Product p ON t.productId = p.id WHERE (:status IS NULL OR t.status = :status)")
     List<Object[]> findTimeDealsWithProducts(@Param("status") TimeDealStatus status);
 

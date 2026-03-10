@@ -19,11 +19,13 @@ services:
     container_name: pposiraegi-redis
     ports:
       - "6379:6379"
+    command: redis-server --appendonly yes #AOF 저장
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
+
 
   backend:
     build:

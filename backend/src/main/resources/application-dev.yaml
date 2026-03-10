@@ -36,11 +36,6 @@ logging:
     cloud.pposiraegi.ecommerce: DEBUG
     org.springframework.web: DEBUG
 
-jwt:
-  secret: ${JWT_SECRET:iqe7Fa7xrhXwJ5SLoee88Yg7DeUuJflj4+IE/XIl81tmZ24qNd4tCUble1Zk2drO=}
-  access-token-validity-in-milliseconds: 3600000
-  refresh-token-validity-in-milliseconds: 86400000
-
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001}
 
