@@ -1,16 +1,17 @@
 package cloud.pposiraegi.ecommerce.domain.product.repository;
 
-import io.lettuce.core.RedisNoScriptException;
 import org.redisson.api.RScript;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.RedisNoScriptException;
+import org.redisson.client.codec.StringCodec;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collections;
 
 @Repository
 public class RedisStockRepository {
-    public static final Long OUT_OF_STOCK_CODE = 1L;
-    
+    public static final Long OUT_OF_STOCK_CODE = -1L;
+
     private final RedissonClient redissonClient;
     private final RScript script;
 
@@ -37,7 +38,7 @@ public class RedisStockRepository {
 
     public RedisStockRepository(RedissonClient redissonClient) {
         this.redissonClient = redissonClient;
-        this.script = redissonClient.getScript();
+        this.script = redissonClient.getScript(StringCodec.INSTANCE);
         loadScripts();
     }
 
