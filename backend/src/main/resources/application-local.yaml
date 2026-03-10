@@ -1,46 +1,5 @@
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:15432/ecommerce
-    username: postgres
-    password: "0000"
-
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-        use_sql_comments: true
-
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      password:
-      database: 0
-      timeout: 3000ms
-      lettuce:
-        pool:
-          max-active: 8
-          max-idle: 8
-          min-idle: 2
-
-    # 스프링 부트 4.0 성능 최적화: 가상 스레드 활성화
-  threads:
-    virtual:
-      enabled: true
-
 logging:
   level:
     cloud.pposiraegi.ecommerce: DEBUG
     org.springframework.web: DEBUG
-
-jwt:
-  secret: "iqe7Fa7xrhXwJ5SLoee88Yg7DeUuJflj4+IE/XIl81tmZ24qNd4tCUble1Zk2drO="
-  access-token-validity-in-milliseconds: 3600000
-  refresh-token-validity-in-milliseconds: 86400000
-
-storage:
-  location: C:/tmp/pposiraegi/uploads/images
 
