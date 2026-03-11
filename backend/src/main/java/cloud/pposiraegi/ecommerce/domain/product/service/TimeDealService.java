@@ -10,18 +10,24 @@ import cloud.pposiraegi.ecommerce.global.common.exception.BusinessException;
 import cloud.pposiraegi.ecommerce.global.common.exception.ErrorCode;
 import com.github.f4b6a3.tsid.TsidFactory;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TimeDealService {
     private final TimeDealRepository timeDealRepository;
     private final TsidFactory tsidFactory;
     private final ProductService productService;
+    private final RedissonClient redissonClient;
+    private final ProductStockService productStockService;
 
 
     @Transactional
@@ -89,6 +95,39 @@ public class TimeDealService {
 
         return TimeDealDto.TimeDealDetailResponse.from(timeDeal, productService.getProductDetail(timeDeal.getProductId()));
     }
+
+    @Transactional
+    public void updateTimeDealStatus() {
+        LocalDateTime now = LocalDateTime.now();
+
+        timeDealRepository.findByStatusAndStartTimeLessThanEqual(TimeDealStatus.PENDING, now)
+                .forEach(TimeDeal::startTimeDeal);
+        timeDealRepository.findByStatusAndEndTimeLessThanEqual(TimeDealStatus.ACTIVE, now)
+                .forEach(TimeDeal::endTimeDeal);
+    }
+
+    @Transactional(readOnly = true)
+    public void warmupUpcomingTimeDeals() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime fiveMinutesLater = now.plusMinutes(5);
+
+        List<TimeDeal> upcomingDeals = timeDealRepository.findByStatusAndStartTimeBetween(TimeDealStatus.PENDING, now, fiveMinutesLater);
+
+        for (TimeDeal upcomingDeal : upcomingDeals) {
+            String warmupFlagKey = "warmup:product:" + upcomingDeal.getProductId();
+            if (redissonClient.getBucket(warmupFlagKey).isExists()) {
+                continue;
+            }
+
+            try {
+                productStockService.warmupProductStock(upcomingDeal.getProductId());
+                redissonClient.getBucket(warmupFlagKey).set(true, Duration.ofMinutes(10));
+            } catch (Exception e) {
+                log.error("Redis: 타임딜 워밍업 중 오류 발생 - Product ID: {}", upcomingDeal.getProductId(), e);
+            }
+        }
+    }
+
 
     @Transactional
     public void decreaseStock(Long id, Integer amount) {
