@@ -2,6 +2,7 @@ package cloud.pposiraegi.ecommerce.domain.order.dto;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
@@ -19,16 +20,7 @@ public class OrderDto {
     ) {
     }
 
-    public record OrderItemDetail(
-            Long skuId,
-            String optionCombination,
-            String imageUrl,
-            Integer quantity,
-            BigDecimal unitPrice
-    ) {
-    }
-
-    public record ShippingAddress(
+    public record ShippingAddressResponse(
             Long addressId,
             String recipientName,
             String zipCode,
@@ -42,18 +34,37 @@ public class OrderDto {
 
     public record OrderSheetResponse(
             String checkoutId,
-            List<OrderItemDetail> orderItems,
+            List<ProductResponse> products,
             BigDecimal totalAmount,
-            ShippingAddress shippingAddress
+            ShippingAddressResponse shippingAddress
+    ) {
+    }
+
+    public record ProductResponse(
+            String name,
+            String thumbnailUrl,
+            List<OrderItemResponse> orderItems
+    ) {
+    }
+
+    public record OrderItemResponse(
+            String name,
+            Integer quantity,
+            BigDecimal originUnitPrice,
+            BigDecimal saleUnitPrice
     ) {
     }
 
     public record OrderRequest(
-            @NotNull Long tempOrderId,
+            @NotNull Long checkoutId,
             @NotNull Long shippingAddressId,
-            String requestMessage
+            @NotBlank String paymentMethod
     ) {
     }
 
 
+    public record OrderResponse(
+            String checkoutId
+    ) {
+    }
 }

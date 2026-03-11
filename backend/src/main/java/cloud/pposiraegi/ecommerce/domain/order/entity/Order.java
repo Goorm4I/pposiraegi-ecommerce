@@ -27,6 +27,9 @@ public class Order extends BaseUpdatedEntity {
     @Column(name = "order_number", unique = true, nullable = false, length = 25)
     private Long orderNumber;
 
+    @Column(name = "checkout_id", nullable = false)
+    private Long checkoutId;
+
     @Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalAmount;
 
@@ -34,9 +37,10 @@ public class Order extends BaseUpdatedEntity {
     private OrderStatus status = OrderStatus.PENDING;
 
     @Builder
-    public Order(Long id, Long userId, Long orderNumber, BigDecimal totalAmount) {
+    public Order(Long id, Long userId, Long checkoutId, Long orderNumber, BigDecimal totalAmount) {
         this.id = id;
         this.userId = userId;
+        this.checkoutId = checkoutId;
         this.orderNumber = orderNumber;
         this.totalAmount = totalAmount;
         this.status = OrderStatus.CREATED;

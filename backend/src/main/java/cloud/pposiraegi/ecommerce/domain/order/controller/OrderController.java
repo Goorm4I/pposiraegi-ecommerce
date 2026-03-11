@@ -23,10 +23,18 @@ public class OrderController {
 
     @GetMapping("/{checkoutId}")
     public ApiResponse<OrderDto.OrderSheetResponse> getCheckoutSession(
-            @PathVariable String checkoutId,
+            @PathVariable Long checkoutId,
             @AuthenticationPrincipal String userId
     ) {
-        return ApiResponse.success(orderService.getOrderSheet(checkoutId, Long.parseLong(userId)));
+        return ApiResponse.success(orderService.getOrderSheet(Long.parseLong(userId), checkoutId));
+    }
+
+    @PostMapping("/submit")
+    public ApiResponse<OrderDto.OrderResponse> createOrder(
+            @AuthenticationPrincipal String userId,
+            @Valid @RequestBody OrderDto.OrderRequest request
+    ) {
+        return ApiResponse.success(orderService.createOrder(Long.parseLong(userId), request));
     }
 
 

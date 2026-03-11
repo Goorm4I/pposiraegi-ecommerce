@@ -30,6 +30,9 @@ public class OrderItem extends BaseCreatedEntity {
     @Column(name = "sku_id", nullable = false)
     private Long skuId;
 
+    @Column(name = "shipment_id")
+    private Long shipmentId;
+
     @Column(name = "product_name", nullable = false, length = 255)
     private String productName;
 
@@ -60,5 +63,9 @@ public class OrderItem extends BaseCreatedEntity {
         this.unitPrice = unitPrice;
         this.discountAmount = discountAmount;
         this.status = OrderItemStatus.PROCESSING;
+    }
+
+    public void registerShipmentId(Long shipmentId) {
+        this.shipmentId = shipmentId;
     }
 }

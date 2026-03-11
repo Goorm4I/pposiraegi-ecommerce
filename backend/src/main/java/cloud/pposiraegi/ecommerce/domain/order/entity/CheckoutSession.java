@@ -1,28 +1,31 @@
 package cloud.pposiraegi.ecommerce.domain.order.entity;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
-@Getter
-@NoArgsConstructor
-@AllArgsConstructor
-public class CheckoutSession implements Serializable {
-    private Long checkoutId;
-    private Long userId;
-    private List<CheckoutItem> orderItems;
-    private BigDecimal totalAmount;
+public record CheckoutSession(
+        Long checkoutId,
+        Long userId,
+        Map<Long, ProductSnapshot> products,
+        List<Item> orderItems,
+        BigDecimal totalAmount
+) implements Serializable {
 
-    @Getter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class CheckoutItem implements Serializable {
-        private Long skuId;
-        private int quantity;
-        private BigDecimal unitPrice;
+    public record ProductSnapshot(
+            String name,
+            String imageUrl
+    ) implements Serializable {
+    }
+
+    public record Item(
+            Long productId,
+            Long skuId,
+            String optionCombination,
+            int quantity,
+            BigDecimal originUnitPrice,
+            BigDecimal saleUnitPrice
+    ) implements Serializable {
     }
 }
