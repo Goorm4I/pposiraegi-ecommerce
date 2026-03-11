@@ -1,13 +1,15 @@
 package cloud.pposiraegi.ecommerce.domain.product.repository;
 
+import org.redisson.api.RBatch;
 import org.redisson.api.RScript;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.RedisNoScriptException;
 import org.redisson.client.codec.StringCodec;
 import org.springframework.stereotype.Repository;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Repository
 public class RedisStockRepository {
@@ -22,24 +24,38 @@ public class RedisStockRepository {
     private String increaseSha;
 
     private static final String DECREASE_SCRIPT = """
-            local stock = redis.call('get', KEYS[1])
-            if stock == false then return nil end
-            local current = tonumber(stock)
-            local amount = tonumber(ARGV[1])
-            if current >= amount then
-                local remain = redis.call('decrby', KEYS[1], amount)
-                redis.call('sadd', KEYS[2], ARGV[2])
-                return remain
+            local num_items = (#KEYS - 1)
+            local dirty_key = KEYS[#KEYS]
+            
+            for i = 1, num_items do
+                local stock = redis.call('get', KEYS[i])
+                if stock == false then return {-2, i} end
+                if (tonumber(stock) < tonumber(ARGV[i])) then return {-1, i} end
             end
-            return -1
+            
+            for i = 1, num_items do
+                redis.call('decrby', KEYS[i], tonumber(ARGV[i]))
+                redis.call('sadd', dirty_key, ARGV[num_items + i])
+            end
+            
+            return {1, 0}
             """;
 
     private static final String INCREASE_SCRIPT = """
-            local stock = redis.call('get', KEYS[1])
-            if stock == false then return nil end
-            local current = redis.call('incrby', KEYS[1], tonumber(ARGV[1]))
-            redis.call('sadd', KEYS[2], ARGV[2])
-            return current
+            local num_items = (#KEYS - 1)
+            local dirty_key = KEYS[#KEYS]
+            
+            for i = 1, num_items do
+                local stock = redis.call('get', KEYS[i])
+                if stock == false then return {-2, i} end
+            end
+            
+            for i = 1, num_items do
+                redis.call('incrby', KEYS[i], tonumber(ARGV[i]))
+                redis.call('sadd', dirty_key, ARGV[num_items + i])
+            end
+            
+            return {1, 0}
             """;
 
     public RedisStockRepository(RedissonClient redissonClient) {
@@ -59,58 +75,56 @@ public class RedisStockRepository {
         redissonClient.getAtomicLong(stockKey).set(quantity);
     }
 
-    public boolean setStockIfNotExists(Long skuId, int quantity) {
-        String stockKey = STOCK_KEY_PREFIX + skuId;
-        if (!redissonClient.getAtomicLong(stockKey).isExists()) {
-            redissonClient.getAtomicLong(stockKey).set(quantity);
-            return true;
-        }
-        return false;
+    public void setStockInBatch(Map<Long, Integer> stockQuantityMap) {
+        RBatch batch = redissonClient.createBatch();
+
+        stockQuantityMap.forEach((skuId, quantity) -> {
+            String stockKey = STOCK_KEY_PREFIX + skuId;
+            batch.getBucket(stockKey, StringCodec.INSTANCE).setIfAbsentAsync(String.valueOf(quantity));
+        });
+
+        batch.execute();
     }
 
-    public Long decreaseAtomic(Long skuId, int quantity) {
-        String stockKey = STOCK_KEY_PREFIX + skuId;
-        List<Object> keys = Arrays.asList(stockKey, DIRTY_SKU_KEY);
+
+    public List<Object> executeBulkAtomic(boolean isDecrease, List<Long> skuIds, List<Integer> quantities) {
+        int size = skuIds.size();
+
+        List<Object> keys = new ArrayList<>();
+        for (Long skuId : skuIds) {
+            keys.add(STOCK_KEY_PREFIX + skuId);
+        }
+        keys.add(DIRTY_SKU_KEY);
+
+        Object[] args = new Object[size * 2];
+        for (int i = 0; i < size; i++) {
+            args[i] = String.valueOf(quantities.get(i));
+            args[size + i] = String.valueOf(skuIds.get(i));
+        }
+
+        String targetSha = isDecrease ? decreaseSha : increaseSha;
+
         try {
             return script.evalSha(
                     RScript.Mode.READ_WRITE,
-                    decreaseSha,
-                    RScript.ReturnType.LONG,
+                    targetSha,
+                    RScript.ReturnType.LIST,
                     keys,
-                    String.valueOf(quantity), String.valueOf(skuId)
+                    args
             );
         } catch (RedisNoScriptException e) {
             loadScripts();
             return script.evalSha(
                     RScript.Mode.READ_WRITE,
-                    decreaseSha,
-                    RScript.ReturnType.LONG,
+                    targetSha,
+                    RScript.ReturnType.LIST,
                     keys,
-                    String.valueOf(quantity), String.valueOf(skuId)
+                    args
             );
         }
     }
 
-    public Long increaseAtomic(Long skuId, int quantity) {
-        String stockKey = STOCK_KEY_PREFIX + skuId;
-        List<Object> keys = Arrays.asList(stockKey, DIRTY_SKU_KEY);
-        try {
-            return script.evalSha(
-                    RScript.Mode.READ_WRITE,
-                    increaseSha,
-                    RScript.ReturnType.LONG,
-                    keys,
-                    String.valueOf(quantity), String.valueOf(skuId)
-            );
-        } catch (RedisNoScriptException e) {
-            loadScripts();
-            return script.evalSha(
-                    RScript.Mode.READ_WRITE,
-                    increaseSha,
-                    RScript.ReturnType.LONG,
-                    keys,
-                    String.valueOf(quantity), String.valueOf(skuId)
-            );
-        }
+    public boolean hasStockKey(Long skuId) {
+        return redissonClient.getAtomicLong(STOCK_KEY_PREFIX + skuId).isExists();
     }
 }
