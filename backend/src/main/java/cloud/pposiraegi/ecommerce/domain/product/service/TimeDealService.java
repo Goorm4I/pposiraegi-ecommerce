@@ -130,6 +130,18 @@ public class TimeDealService {
 
 
     @Transactional
+    public void updateTimeDeal(Long id, TimeDealDto.UpdateRequest request) {
+        TimeDeal timeDeal = timeDealRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TIMEDEAL_NOT_FOUND));
+
+        if (request.endTime().isBefore(request.startTime())) {
+            throw new BusinessException(ErrorCode.INVALID_TIMEDEAL_TIME_RANGE);
+        }
+
+        timeDeal.updateSchedule(request.startTime(), request.endTime(), request.dealQuantity());
+    }
+
+    @Transactional
     public void decreaseStock(Long id, Integer amount) {
         TimeDeal timeDeal = timeDealRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TIMEDEAL_NOT_FOUND));

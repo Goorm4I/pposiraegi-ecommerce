@@ -28,6 +28,12 @@ public class TimeDealAdminController {
         return ApiResponse.success(null);
     }
 
+    @PutMapping("/{id}")
+    public ApiResponse<?> updateTimeDeal(@PathVariable Long id, @Valid @RequestBody TimeDealDto.UpdateRequest request) {
+        timeDealService.updateTimeDeal(id, request);
+        return ApiResponse.success(null);
+    }
+
     @GetMapping
     public ApiResponse<?> getTimeDeals(@RequestParam(required = false) TimeDealStatus status) {
         return ApiResponse.success(timeDealService.getAdminTimeDeals(status));

@@ -71,6 +71,12 @@ public class TimeDeal extends BaseUpdatedEntity {
         this.status = TimeDealStatus.SUSPENDED;
     }
 
+    public void updateSchedule(LocalDateTime startTime, LocalDateTime endTime, Integer totalQuantity) {
+        this.startTime = startTime;
+        this.endTime = endTime;
+        this.totalQuantity = totalQuantity;
+    }
+
     public void decreaseQuantity(int amount) {
         if (this.status != TimeDealStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.TIMEDEAL_NOT_ACTIVE);

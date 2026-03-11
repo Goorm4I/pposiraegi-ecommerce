@@ -16,6 +16,13 @@ public class TimeDealDto {
     ) {
     }
 
+    public record UpdateRequest(
+            @NotNull LocalDateTime startTime,
+            @NotNull LocalDateTime endTime,
+            @NotNull @Min(1) Integer dealQuantity
+    ) {
+    }
+
     public record CreateRequestWithProduct(
             @Valid @NotNull ProductDto.ProductCreateRequest product,
             @NotNull @Min(1) Integer dealQuantity,
