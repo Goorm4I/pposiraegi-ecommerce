@@ -31,7 +31,7 @@ public class OrderNumberGenerator {
         }
 
         long sequence = counter.incrementAndGet();
-        return Long.parseLong(String.format("%s-%08d", this.currentDateStr, sequence));
+        return Long.parseLong(String.format("%s%08d", this.currentDateStr, sequence));
     }
 
     private String getCurrentDateStr() {
