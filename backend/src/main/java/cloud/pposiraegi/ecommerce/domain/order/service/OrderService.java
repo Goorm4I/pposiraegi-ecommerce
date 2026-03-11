@@ -45,6 +45,7 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
     private final ProductStockService productStockService;
     private final ProductService productService;
+    private final MockPgClient mockPgClient;
 
     @Transactional(readOnly = true)
     public OrderDto.OrderSheetResponse createOrderSheet(Long userId, OrderDto.OrderSheetRequest request) {
@@ -143,6 +144,8 @@ public class OrderService {
             throw new BusinessException(ErrorCode.CHECKOUT_USER_MISMATCH);
         }
 
+        mockPgClient.verifyPayment(request.pgImpUid(), session.totalAmount());
+
         Long orderId = tsidFactory.create().toLong();
 
         Order order = Order.builder()
@@ -151,6 +154,7 @@ public class OrderService {
                 .checkoutId(request.checkoutId())
                 .orderNumber(OrderNumberGenerator.getInstance().generate())
                 .totalAmount(session.totalAmount())
+                .pgImpUid(request.pgImpUid())
                 .build();
 
         List<OrderItem> orderItems = new ArrayList<>();
@@ -180,10 +184,13 @@ public class OrderService {
 
         productStockService.decreaseStocks(stockDecreaseRequests);
 
+        String redisKey = REDIS_KEY_PREFIX + request.checkoutId();
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCompletion(int status) {
-                if (status == STATUS_ROLLED_BACK) {
+                if (status == STATUS_COMMITTED) {
+                    redisTemplate.delete(redisKey);
+                } else if (status == STATUS_ROLLED_BACK) {
                     try {
                         log.warn("주문 DB 저장 실패, Redis 재고 복구 시도");
                         productStockService.increaseStocks(stockDecreaseRequests);

@@ -58,7 +58,10 @@ public enum ErrorCode {
     CHECKOUT_ALREADY_PROCESSED(HttpStatus.GONE, "O004", "이미 결제가 완료되었거나 처리 중인 주문서입니다."),
 
     COUPON_EXPIRED(HttpStatus.BAD_REQUEST, "M001", "만료된 쿠폰입니다."),
-    COUPON_NOT_FOUND(HttpStatus.NOT_FOUND, "M002", "쿠폰을 찾을 수 없습니다.");
+    COUPON_NOT_FOUND(HttpStatus.NOT_FOUND, "M002", "쿠폰을 찾을 수 없습니다."),
+
+    PG_VERIFICATION_FAILED(HttpStatus.BAD_GATEWAY, "PG001", "PG 결제 검증에 실패했습니다."),
+    PG_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "PG002", "결제 금액이 주문 금액과 일치하지 않습니다.");
 
 
     private final HttpStatus status;

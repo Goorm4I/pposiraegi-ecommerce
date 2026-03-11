@@ -58,7 +58,8 @@ public class OrderDto {
     public record OrderRequest(
             @NotNull Long checkoutId,
             @NotNull Long shippingAddressId,
-            @NotBlank String paymentMethod
+            @NotBlank String paymentMethod,
+            @NotBlank String pgImpUid
     ) {
     }
 

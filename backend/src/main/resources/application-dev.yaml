@@ -41,3 +41,6 @@ cors:
 
 storage:
   location: /app/uploads/
+
+mock-pg:
+  url: ${MOCK_PG_URL:https://mock-pg-1046420547293.us-central1.run.app}
