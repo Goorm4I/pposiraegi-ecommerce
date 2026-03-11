@@ -14,6 +14,8 @@ public interface UserAddressRepository extends JpaRepository<UserAddress, Long> 
 
     Optional<UserAddress> findByUserIdAndIsDefaultTrue(Long userId);
 
+    Optional<UserAddress> findFirstByUserIdOrderByLastUsedAtDesc(Long userId);
+
     @Query("SELECT a FROM UserAddress a WHERE a.userId = :userId ORDER BY a.isDefault DESC, a.lastUsedAt DESC")
     List<UserAddress> findAllByUserId(Long userId);
 }

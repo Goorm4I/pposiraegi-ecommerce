@@ -6,8 +6,8 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.atomic.AtomicLong;
 
-@Getter
 public class OrderNumberGenerator {
+    @Getter
     private static final OrderNumberGenerator instance = new OrderNumberGenerator();
 
     private final AtomicLong counter;
