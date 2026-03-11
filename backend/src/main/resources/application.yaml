@@ -56,3 +56,6 @@ cors:
   allowed-origins:
     - "http://localhost:3000"
     - "https://pposiraegi.cloud"
+
+mock-pg:
+  url: "https://mock-pg-1046420547293.us-central1.run.app"
