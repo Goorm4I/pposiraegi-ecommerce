@@ -6,6 +6,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -15,7 +16,10 @@ import java.math.BigDecimal;
 
 @Getter
 @Entity
-@Table(name = "orders")
+@Table(
+    name = "orders",
+    uniqueConstraints = @UniqueConstraint(name = "uq_orders_checkout_id", columnNames = "checkout_id")
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Order extends BaseUpdatedEntity {
     @Id
