@@ -58,10 +58,10 @@ public class ProductDto {
             String name,
             String description,
             String brandName,
-            String originPrice,
-            String salePrice,
+            BigDecimal originPrice,
+            BigDecimal salePrice,
             String thumbnailUrl,
-            String averageRating,
+            BigDecimal averageRating,
             Integer reviewCount,
             String status
             //sku
@@ -72,10 +72,10 @@ public class ProductDto {
                     product.getName(),
                     product.getDescription(),
                     product.getBrandName(),
-                    product.getOriginPrice().toString(),
-                    product.getSalePrice().toString(),
+                    product.getOriginPrice().stripTrailingZeros(),
+                    product.getSalePrice().stripTrailingZeros(),
                     product.getThumbnailUrl(),
-                    product.getAverageRating().toString(),
+                    product.getAverageRating().stripTrailingZeros(),
                     product.getReviewCount(),
                     product.getStatus().toString()
             );
