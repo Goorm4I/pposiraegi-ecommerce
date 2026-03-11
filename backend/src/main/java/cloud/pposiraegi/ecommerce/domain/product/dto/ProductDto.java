@@ -120,8 +120,8 @@ public class ProductDto {
     public record SkuResponse(
             String skuId,
             String skuCode,
-            String additionalPrice,
-            String stockQuantity,
+            BigDecimal additionalPrice,
+            Integer stockQuantity,
             String status,
             List<Long> optionValueIds
     ) {
@@ -129,8 +129,8 @@ public class ProductDto {
             return new SkuResponse(
                     sku.getId().toString(),
                     sku.getSkuCode(),
-                    sku.getAdditionalPrice().toString(),
-                    sku.getStockQuantity().toString(),
+                    sku.getAdditionalPrice(),
+                    sku.getStockQuantity(),
                     sku.getStatus().name(),
                     optionValueIds
             );

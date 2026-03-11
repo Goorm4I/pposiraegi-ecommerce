@@ -38,6 +38,7 @@ public enum ErrorCode {
     PRODUCT_IMAGE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "P014", "등록할 수 있는 상품 이미지 개수를 초과했습니다."),
     SKU_NOT_FOUND(HttpStatus.NOT_FOUND, "P004", "해당 상품의 옵션(SKU) 정보를 찾을 수 없습니다."),
     PRODUCT_NOT_ACTIVE(HttpStatus.BAD_REQUEST, "P005", "현재 판매 중이지 않은 상품입니다."),
+
     SKU_MISMATCH(HttpStatus.BAD_REQUEST, "P006", "상품과 옵션 정보가 일치하지 않습니다."),
     OUT_OF_STOCK(HttpStatus.BAD_REQUEST, "P002", "재고가 부족합니다."),
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "P003", "리뷰를 찾을 수 없습니다."),

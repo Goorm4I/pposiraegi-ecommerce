@@ -3,7 +3,6 @@ package cloud.pposiraegi.ecommerce.domain.product.dto;
 import cloud.pposiraegi.ecommerce.domain.product.entity.Category;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +29,7 @@ public class CategoryDto {
             String name,
             Integer depth,
             Integer displayOrder,
-            @Setter List<CategoryResponse> children
+            List<CategoryResponse> children
     ) {
         public static CategoryResponse from(Category category) {
             return new CategoryResponse(
