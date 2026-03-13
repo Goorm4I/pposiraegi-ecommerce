@@ -28,6 +28,11 @@ public class MockPgClient {
      * GET {pgUrl}/payments/{impUid}
      */
     public void verifyPayment(String impUid, BigDecimal expectedAmount) {
+        if (impUid != null && impUid.startsWith("mock_")) {
+            log.info("Mock PG 검증 스킵: impUid={}, amount={}", impUid, expectedAmount);
+            return;
+        }
+
         String url = pgUrl + "/payments/" + impUid;
 
         try {
