@@ -1,32 +1,4 @@
 services:
-  db:
-    image: postgres:15
-    container_name: pposiraegi-db
-    environment:
-      POSTGRES_DB: ecommerce
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d ecommerce"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:8
-    container_name: pposiraegi-redis
-    ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes #AOF 저장
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-
   backend:
     build:
       context: ./backend
@@ -35,16 +7,14 @@ services:
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/ecommerce
-      SPRING_DATASOURCE_USERNAME: user
-      SPRING_DATASOURCE_PASSWORD: password
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
-      JWT_SECRET: "${JWT_SECRET:-8k8gRYoBudweyETDGCGi6soWOrMP09V9VrArAZ+kUd0=}"
-      CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}"
-      SPRING_PROFILES_ACTIVE: "${SPRING_PROFILES_ACTIVE:-dev}"
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      SPRING_PROFILES_ACTIVE: "${SPRING_PROFILES_ACTIVE:-prod}"
+      SPRING_DATASOURCE_URL: "${SPRING_DATASOURCE_URL}"
+      SPRING_DATASOURCE_USERNAME: "${SPRING_DATASOURCE_USERNAME}"
+      SPRING_DATASOURCE_PASSWORD: "${SPRING_DATASOURCE_PASSWORD}"
+      SPRING_DATA_REDIS_HOST: "${SPRING_DATA_REDIS_HOST}"
+      SPRING_DATA_REDIS_PORT: "${SPRING_DATA_REDIS_PORT:-6379}"
+      JWT_SECRET: "${JWT_SECRET}"
+      CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS}"
+      TZ: "UTC"
+      JAVA_OPTS: "-Xms512m -Xmx512m -Duser.timezone=UTC -Djava.security.egd=file:/dev/./urandom"
+    restart: unless-stopped

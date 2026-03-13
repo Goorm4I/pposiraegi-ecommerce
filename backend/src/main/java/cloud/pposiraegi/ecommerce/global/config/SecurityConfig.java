@@ -47,6 +47,7 @@ public class SecurityConfig {
 
                 // 경로별 권한 설정
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
@@ -54,7 +55,13 @@ public class SecurityConfig {
                                 "/swagger-ui.html"
                         ).permitAll()
 
-                        .requestMatchers("/api/v1/**").permitAll()
+                        .requestMatchers(
+                                "/api/v1/auth/**",
+                                "/api/v1/users",
+                                "/api/v1/categories/**",
+                                "/api/v1/time-deals/**"
+                        ).permitAll()
+                        
                         .anyRequest().authenticated()
                 )
 
