@@ -4,6 +4,7 @@ WORKDIR /app
 
 # Dockerfile이 backend 안에 있으므로 상대 경로로 복사
 COPY gradlew .
+RUN chmod +x gradlew
 COPY gradle gradle
 COPY build.gradle settings.gradle ./
 
