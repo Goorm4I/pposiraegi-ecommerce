@@ -31,10 +31,11 @@ public class OrderController {
 
     @PostMapping("/submit")
     public ApiResponse<OrderDto.OrderResponse> createOrder(
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
             @AuthenticationPrincipal String userId,
             @Valid @RequestBody OrderDto.OrderRequest request
     ) {
-        return ApiResponse.success(orderService.createOrder(Long.parseLong(userId), request));
+        return ApiResponse.success(orderService.createOrder(idempotencyKey, Long.parseLong(userId), request));
     }
 
 
