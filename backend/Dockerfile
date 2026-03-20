@@ -12,6 +12,7 @@ RUN ./gradlew build -x test --parallel --continue > /dev/null 2>&1 || true
 
 # 소스 복사 (Dockerfile 기준 src 폴더)
 COPY src ./src
+RUN chmod +x gradlew
 RUN ./gradlew clean bootJar -x test
 
 # [Stage 2: Run]
