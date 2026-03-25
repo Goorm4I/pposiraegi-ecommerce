@@ -15,6 +15,7 @@ public class OrderDto {
     }
 
     public record OrderItemRequest(
+            Long timeDealId,
             @NotNull Long skuId,
             @NotNull @Min(1) Integer quantity
     ) {

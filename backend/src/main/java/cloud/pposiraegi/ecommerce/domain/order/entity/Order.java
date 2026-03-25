@@ -2,10 +2,7 @@ package cloud.pposiraegi.ecommerce.domain.order.entity;
 
 import cloud.pposiraegi.ecommerce.domain.order.enums.OrderStatus;
 import cloud.pposiraegi.ecommerce.global.common.entity.BaseUpdatedEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -33,6 +30,7 @@ public class Order extends BaseUpdatedEntity {
     @Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalAmount;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private OrderStatus status = OrderStatus.PENDING;
 

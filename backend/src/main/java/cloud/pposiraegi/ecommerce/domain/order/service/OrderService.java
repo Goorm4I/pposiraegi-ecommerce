@@ -4,9 +4,12 @@ import cloud.pposiraegi.ecommerce.domain.order.dto.OrderDto;
 import cloud.pposiraegi.ecommerce.domain.order.entity.CheckoutSession;
 import cloud.pposiraegi.ecommerce.domain.order.entity.IdempotencyRecord;
 import cloud.pposiraegi.ecommerce.domain.order.enums.IdempotencyStatus;
+import cloud.pposiraegi.ecommerce.domain.order.enums.ItemSaleType;
 import cloud.pposiraegi.ecommerce.domain.order.repository.IdempotencyRecordRepository;
 import cloud.pposiraegi.ecommerce.domain.product.dto.ProductInfoDto;
+import cloud.pposiraegi.ecommerce.domain.product.dto.TimeDealInfoDto;
 import cloud.pposiraegi.ecommerce.domain.product.service.ProductQueryService;
+import cloud.pposiraegi.ecommerce.domain.product.service.TimeDealQueryService;
 import cloud.pposiraegi.ecommerce.domain.user.user.service.UserAddressQueryService;
 import cloud.pposiraegi.ecommerce.global.common.exception.BusinessException;
 import cloud.pposiraegi.ecommerce.global.common.exception.ErrorCode;
@@ -32,6 +35,7 @@ public class OrderService {
 
     private final TsidFactory tsidFactory;
     private final ProductQueryService productQueryService;
+    private final TimeDealQueryService timeDealQueryService;
 
     private final UserAddressQueryService userAddressQueryService;
     private final OrderTransactionProcessor orderTransactionProcessor;
@@ -45,12 +49,22 @@ public class OrderService {
         Long checkoutId = tsidFactory.create().toLong();
         BigDecimal totalAmount = BigDecimal.ZERO;
 
-        List<Long> requestSkuIds = request.orderItems().stream().
-                map(OrderDto.OrderItemRequest::skuId)
+        List<Long> requestSkuIds = request.orderItems().stream()
+                .map(OrderDto.OrderItemRequest::skuId)
+                .toList();
+
+        List<Long> requestTimeDealIds = request.orderItems().stream()
+                .map(OrderDto.OrderItemRequest::timeDealId)
+                .filter(Objects::nonNull)
+                .distinct()
                 .toList();
 
         Map<Long, ProductInfoDto.ProductAndSkuInfo> skuMap = productQueryService.getSkuInfos(requestSkuIds).stream()
                 .collect(Collectors.toMap(ProductInfoDto.ProductAndSkuInfo::skuId, product -> product));
+
+        Map<Long, TimeDealInfoDto.TimeDealInfo> timeDealMap = requestTimeDealIds.isEmpty() ? Collections.emptyMap() :
+                timeDealQueryService.getTimeDeals(requestTimeDealIds).stream()
+                        .collect(Collectors.toMap(TimeDealInfoDto.TimeDealInfo::id, timeDeal -> timeDeal));
 
         Map<Long, CheckoutSession.ProductSnapshot> sessionProducts = new HashMap<>();
         List<CheckoutSession.Item> sessionItems = new ArrayList<>();
@@ -67,11 +81,32 @@ public class OrderService {
                 throw new BusinessException(ErrorCode.OUT_OF_STOCK);
             }
 
+            ItemSaleType saleType = ItemSaleType.Normal;
+
+            if (itemRequest.timeDealId() != null) {
+                TimeDealInfoDto.TimeDealInfo timeDeal = timeDealMap.get(itemRequest.timeDealId());
+                if (timeDeal == null) {
+                    throw new BusinessException(ErrorCode.TIMEDEAL_NOT_FOUND);
+                }
+                if (!timeDeal.productId().equals(sku.productId())) {
+                    throw new BusinessException(ErrorCode.INVALID_TIME_DEAL_PRODUCT);
+                }
+                if (!timeDeal.isActive()) {
+                    throw new BusinessException(ErrorCode.TIMEDEAL_NOT_ACTIVE);
+                }
+                if (timeDeal.purchaseLimit() != null && itemRequest.quantity() > timeDeal.purchaseLimit()) {
+                    throw new BusinessException(ErrorCode.PURCHASE_LIMIT_EXCEEDED);
+                }
+
+                saleType = ItemSaleType.Time_Deal;
+            }
+
             BigDecimal lineAmount = sku.saleUnitPrice().multiply(BigDecimal.valueOf(itemRequest.quantity()));
             totalAmount = totalAmount.add(lineAmount);
 
             sessionProducts.putIfAbsent(sku.productId(), new CheckoutSession.ProductSnapshot(sku.productName(), sku.thumbnailUrl()));
-            sessionItems.add(new CheckoutSession.Item(sku.productId(), sku.skuId(), sku.combinationKey(), itemRequest.quantity(), sku.originUnitPrice(), sku.saleUnitPrice()));
+
+            sessionItems.add(new CheckoutSession.Item(sku.productId(), saleType, itemRequest.timeDealId(), sku.skuId(), sku.combinationKey(), itemRequest.quantity(), sku.originUnitPrice(), sku.saleUnitPrice()));
 
             orderItemsByProductId.computeIfAbsent(sku.productId(), k -> new ArrayList<>())
                     .add(new OrderDto.OrderItemResponse(sku.combinationKey(), itemRequest.quantity(), sku.originUnitPrice(), sku.saleUnitPrice()));

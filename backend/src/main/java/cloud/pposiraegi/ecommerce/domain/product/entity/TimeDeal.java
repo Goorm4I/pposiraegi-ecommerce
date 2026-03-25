@@ -23,6 +23,9 @@ public class TimeDeal extends BaseUpdatedEntity {
     @Column(name = "product_id", nullable = false)
     private Long productId;
 
+    @Column(name = "purchase_limit")
+    private Integer purchaseLimit;
+
     @Column(name = "total_quantity", nullable = false)
     private Integer totalQuantity;
 
@@ -43,6 +46,7 @@ public class TimeDeal extends BaseUpdatedEntity {
     public TimeDeal(Long id, Long productId, Integer totalQuantity, LocalDateTime startTime, LocalDateTime endTime) {
         this.id = id;
         this.productId = productId;
+        this.purchaseLimit = 1;
         this.totalQuantity = totalQuantity;
         this.remainQuantity = totalQuantity;
         this.startTime = startTime;

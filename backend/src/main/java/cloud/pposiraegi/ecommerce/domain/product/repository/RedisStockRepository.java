@@ -14,8 +14,8 @@ import java.util.Map;
 @Repository
 public class RedisStockRepository {
     public static final Long OUT_OF_STOCK_CODE = -1L;
-    public static final String STOCK_KEY_PREFIX = "stock:sku:";
-    public static final String DIRTY_SKU_KEY = "stock:dirty:sku";
+    public static final String STOCK_KEY_PREFIX = "product:stock:sku:";
+    public static final String DIRTY_SKU_KEY = "product:stock:dirty:sku";
 
     private final RedissonClient redissonClient;
     private final RScript script;
