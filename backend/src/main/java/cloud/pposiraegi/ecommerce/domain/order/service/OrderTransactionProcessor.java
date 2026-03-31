@@ -11,6 +11,8 @@ import cloud.pposiraegi.ecommerce.domain.order.generator.OrderNumberGenerator;
 import cloud.pposiraegi.ecommerce.domain.order.repository.IdempotencyRecordRepository;
 import cloud.pposiraegi.ecommerce.domain.order.repository.OrderItemRepository;
 import cloud.pposiraegi.ecommerce.domain.order.repository.OrderRepository;
+import cloud.pposiraegi.ecommerce.domain.order.repository.RedisPurchaseLimitRepository;
+import cloud.pposiraegi.ecommerce.domain.product.service.ProductQueryService;
 import cloud.pposiraegi.ecommerce.domain.product.service.ProductStockService;
 import cloud.pposiraegi.ecommerce.global.common.exception.BusinessException;
 import cloud.pposiraegi.ecommerce.global.common.exception.ErrorCode;
@@ -41,6 +43,8 @@ public class OrderTransactionProcessor {
     private final OrderItemRepository orderItemRepository;
     private final ProductStockService productStockService;
     private final ObjectMapper objectMapper;
+    private final ProductQueryService productQueryService;
+    private final RedisPurchaseLimitRepository redisPurchaseLimitRepository;
 
     @Value("${pg.success-url}")
     private String pgSuccessUrl;
@@ -77,6 +81,7 @@ public class OrderTransactionProcessor {
 
         List<OrderItem> orderItems = new ArrayList<>();
         Map<Long, Integer> stockDecreaseRequests = new HashMap<>();
+        Map<Long, Integer> purchaseLimitRollbackRequests = new HashMap<>();
 
         orderRepository.save(order);
 
@@ -85,6 +90,25 @@ public class OrderTransactionProcessor {
         for (CheckoutSession.Item item : session.orderItems()) {
             if (orderName.isEmpty()) {
                 orderName = session.products().get(item.productId()).name();
+            }
+
+            Integer limit = productQueryService.getSkuPurchaseLimit(item.skuId());
+
+            if (limit != null && limit > 0) {
+                //TODO: 수량 제한 초기화 로직 작성
+                boolean isAllowed = redisPurchaseLimitRepository.checkAndIncreasePurchaseCount(
+                        item.skuId(),
+                        userId,
+                        limit,
+                        item.quantity(),
+                        0
+                );
+
+                if (!isAllowed) {
+                    throw new BusinessException(ErrorCode.PURCHASE_LIMIT_EXCEEDED);
+                }
+
+                purchaseLimitRollbackRequests.merge(item.skuId(), item.quantity(), Integer::sum);
             }
             OrderItem orderItem = OrderItem.builder()
                     .id(tsidFactory.create().toLong())
@@ -117,6 +141,14 @@ public class OrderTransactionProcessor {
                     } catch (Exception e) {
                         log.error("CRITICAL: Redis 재고 복구 실패", e);
                     }
+
+                    purchaseLimitRollbackRequests.forEach((skuId, qty) -> {
+                        try {
+                            redisPurchaseLimitRepository.decreasePurchaseCount(skuId, userId, qty);
+                        } catch (Exception e) {
+                            log.error("CRITICAL: Redis 구매 수량 복구 실패", e);
+                        }
+                    });
                 }
             }
         });
@@ -153,12 +185,23 @@ public class OrderTransactionProcessor {
 
             List<OrderItem> items = orderItemRepository.findByOrderId(pendingOrder.getId());
             Map<Long, Integer> stockRestoreRequest = new HashMap<>();
+            Map<Long, Integer> purchaseLimitRestoreRequest = new HashMap<>();
 
             for (OrderItem item : items) {
                 stockRestoreRequest.put(item.getSkuId(), item.getQuantity());
+
+                Integer limit = productQueryService.getSkuPurchaseLimit(item.getSkuId());
+                if (limit != null && limit > 0) {
+                    purchaseLimitRestoreRequest.merge(item.getSkuId(), item.getQuantity(), Integer::sum);
+                }
+
             }
 
             productStockService.increaseStocks(stockRestoreRequest);
+
+            purchaseLimitRestoreRequest.forEach((skuId, qty) -> {
+                redisPurchaseLimitRepository.decreasePurchaseCount(skuId, userId, qty);
+            });
         }
     }
 }

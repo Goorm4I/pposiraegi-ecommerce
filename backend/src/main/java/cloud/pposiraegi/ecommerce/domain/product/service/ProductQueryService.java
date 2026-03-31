@@ -10,6 +10,7 @@ import cloud.pposiraegi.ecommerce.domain.product.repository.ProductSkuRepository
 import cloud.pposiraegi.ecommerce.global.common.exception.BusinessException;
 import cloud.pposiraegi.ecommerce.global.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,5 +53,13 @@ public class ProductQueryService {
                     }
                     return ProductInfoDto.ProductAndSkuInfo.from(product, sku);
                 }).toList();
+    }
+
+    @Transactional(readOnly = true)
+    @Cacheable(cacheNames = "skuPurchaseLimit", key = "#skuId")
+    public Integer getSkuPurchaseLimit(Long skuId) {
+        return productSkuRepository.findById(skuId)
+                .map(ProductSku::getPurchaseLimit)
+                .orElse(0);
     }
 }

@@ -4,7 +4,6 @@ import cloud.pposiraegi.ecommerce.domain.order.dto.OrderDto;
 import cloud.pposiraegi.ecommerce.domain.order.entity.CheckoutSession;
 import cloud.pposiraegi.ecommerce.domain.order.entity.IdempotencyRecord;
 import cloud.pposiraegi.ecommerce.domain.order.enums.IdempotencyStatus;
-import cloud.pposiraegi.ecommerce.domain.order.enums.ItemSaleType;
 import cloud.pposiraegi.ecommerce.domain.order.repository.IdempotencyRecordRepository;
 import cloud.pposiraegi.ecommerce.domain.product.dto.ProductInfoDto;
 import cloud.pposiraegi.ecommerce.domain.product.dto.TimeDealInfoDto;
@@ -81,8 +80,6 @@ public class OrderService {
                 throw new BusinessException(ErrorCode.OUT_OF_STOCK);
             }
 
-            ItemSaleType saleType = ItemSaleType.Normal;
-
             if (itemRequest.timeDealId() != null) {
                 TimeDealInfoDto.TimeDealInfo timeDeal = timeDealMap.get(itemRequest.timeDealId());
                 if (timeDeal == null) {
@@ -97,8 +94,6 @@ public class OrderService {
                 if (timeDeal.purchaseLimit() != null && itemRequest.quantity() > timeDeal.purchaseLimit()) {
                     throw new BusinessException(ErrorCode.PURCHASE_LIMIT_EXCEEDED);
                 }
-
-                saleType = ItemSaleType.Time_Deal;
             }
 
             BigDecimal lineAmount = sku.saleUnitPrice().multiply(BigDecimal.valueOf(itemRequest.quantity()));
@@ -106,7 +101,7 @@ public class OrderService {
 
             sessionProducts.putIfAbsent(sku.productId(), new CheckoutSession.ProductSnapshot(sku.productName(), sku.thumbnailUrl()));
 
-            sessionItems.add(new CheckoutSession.Item(sku.productId(), saleType, itemRequest.timeDealId(), sku.skuId(), sku.combinationKey(), itemRequest.quantity(), sku.originUnitPrice(), sku.saleUnitPrice()));
+            sessionItems.add(new CheckoutSession.Item(sku.productId(), itemRequest.timeDealId(), sku.skuId(), sku.combinationKey(), itemRequest.quantity(), sku.originUnitPrice(), sku.saleUnitPrice()));
 
             orderItemsByProductId.computeIfAbsent(sku.productId(), k -> new ArrayList<>())
                     .add(new OrderDto.OrderItemResponse(sku.combinationKey(), itemRequest.quantity(), sku.originUnitPrice(), sku.saleUnitPrice()));

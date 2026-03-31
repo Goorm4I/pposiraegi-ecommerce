@@ -1,7 +1,5 @@
 package cloud.pposiraegi.ecommerce.domain.order.entity;
 
-import cloud.pposiraegi.ecommerce.domain.order.enums.ItemSaleType;
-
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.List;
@@ -23,7 +21,6 @@ public record CheckoutSession(
 
     public record Item(
             Long productId,
-            ItemSaleType saleType,
             Long timeDealId,
             Long skuId,
             String optionCombination,

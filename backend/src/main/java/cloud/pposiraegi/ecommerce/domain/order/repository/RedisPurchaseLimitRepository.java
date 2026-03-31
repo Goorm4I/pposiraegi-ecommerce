@@ -77,8 +77,8 @@ public class RedisPurchaseLimitRepository {
     }
 
 
-    public boolean checkAndIncreasePurchaseCount(Long timeDealId, Long userId, int limit, int requestQty, int ttlSeconds) {
-        String key = String.format(LIMIT_KEY_PREFIX, timeDealId, userId);
+    public boolean checkAndIncreasePurchaseCount(Long skuId, Long userId, int limit, int requestQty, int ttlSeconds) {
+        String key = String.format(LIMIT_KEY_PREFIX, skuId, userId);
 
         try {
             return executeCheckAndIncrease(key, limit, requestQty, ttlSeconds);
