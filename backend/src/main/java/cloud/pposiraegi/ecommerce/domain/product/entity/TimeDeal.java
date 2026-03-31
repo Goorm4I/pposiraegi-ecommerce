@@ -23,6 +23,9 @@ public class TimeDeal extends BaseUpdatedEntity {
     @Column(name = "product_id", nullable = false)
     private Long productId;
 
+    @Column(name = "original_product_id")
+    private Long originalProductId;
+
     @Column(name = "purchase_limit")
     private Integer purchaseLimit;
 
