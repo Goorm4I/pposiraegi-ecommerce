@@ -2,4 +2,3 @@ logging:
   level:
     cloud.pposiraegi.ecommerce: DEBUG
     org.springframework.web: DEBUG
-

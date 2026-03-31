@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '4.0.3'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.sonarqube' version '7.2.3.7755'
 }
 
 group = 'cloud.pposiraegi'
@@ -61,6 +62,18 @@ dependencies {
 
     // Redisson
     implementation 'org.redisson:redisson-spring-boot-starter:4.3.0'
+}
+
+sonar {
+    properties {
+        property "sonar.projectKey", "pposiraegi-ecommerce"
+        property "sonar.projectName", "PPosiraegi E-commerce"
+        property "sonar.host.url", "http://localhost:9000"
+        property "sonar.token", "squ_7e6f31e5153f34d283f58563ec584d08ff9fa579"
+        property "sonar.sources", "src/main/java"
+        property "sonar.tests", "src/test/java"
+        property "sonar.java.binaries", "build/classes"
+    }
 }
 
 tasks.named('test') {
