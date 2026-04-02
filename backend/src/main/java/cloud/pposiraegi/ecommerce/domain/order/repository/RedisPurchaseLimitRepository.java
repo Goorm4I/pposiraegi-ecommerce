@@ -76,6 +76,14 @@ public class RedisPurchaseLimitRepository {
         this.decreaseSha = script.scriptLoad(DECREASE_SCRIPT);
     }
 
+    public int getCurrentPurchaseCount(Long skuId, Long userId) {
+        String key = String.format(LIMIT_KEY_PREFIX, skuId, userId);
+        Object value = redissonClient.getBucket(key).get();
+        if (value == null) {
+            return 0;
+        }
+        return Integer.parseInt(value.toString());
+    }
 
     public boolean checkAndIncreasePurchaseCount(Long skuId, Long userId, int limit, int requestQty, int ttlSeconds) {
         String key = String.format(LIMIT_KEY_PREFIX, skuId, userId);

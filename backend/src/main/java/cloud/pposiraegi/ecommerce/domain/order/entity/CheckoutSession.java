@@ -21,7 +21,6 @@ public record CheckoutSession(
 
     public record Item(
             Long productId,
-            Long timeDealId,
             Long skuId,
             String optionCombination,
             int quantity,

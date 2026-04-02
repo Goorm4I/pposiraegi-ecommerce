@@ -5,8 +5,8 @@ import cloud.pposiraegi.ecommerce.domain.order.entity.CheckoutSession;
 import cloud.pposiraegi.ecommerce.domain.order.entity.IdempotencyRecord;
 import cloud.pposiraegi.ecommerce.domain.order.enums.IdempotencyStatus;
 import cloud.pposiraegi.ecommerce.domain.order.repository.IdempotencyRecordRepository;
+import cloud.pposiraegi.ecommerce.domain.order.repository.RedisPurchaseLimitRepository;
 import cloud.pposiraegi.ecommerce.domain.product.dto.ProductInfoDto;
-import cloud.pposiraegi.ecommerce.domain.product.dto.TimeDealInfoDto;
 import cloud.pposiraegi.ecommerce.domain.product.service.ProductQueryService;
 import cloud.pposiraegi.ecommerce.domain.product.service.TimeDealQueryService;
 import cloud.pposiraegi.ecommerce.domain.user.user.service.UserAddressQueryService;
@@ -42,6 +42,7 @@ public class OrderService {
     private final IdempotencyRecordRepository idempotencyRecordRepository;
     private final RedissonClient redissonClient;
     private final CheckoutSessionService checkoutSessionService;
+    private final RedisPurchaseLimitRepository redisPurchaseLimitRepository;
 
     @Transactional(readOnly = true)
     public OrderDto.OrderSheetResponse createOrderSheet(Long userId, OrderDto.OrderSheetRequest request) {
@@ -52,18 +53,8 @@ public class OrderService {
                 .map(OrderDto.OrderItemRequest::skuId)
                 .toList();
 
-        List<Long> requestTimeDealIds = request.orderItems().stream()
-                .map(OrderDto.OrderItemRequest::timeDealId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
-
         Map<Long, ProductInfoDto.ProductAndSkuInfo> skuMap = productQueryService.getSkuInfos(requestSkuIds).stream()
                 .collect(Collectors.toMap(ProductInfoDto.ProductAndSkuInfo::skuId, product -> product));
-
-        Map<Long, TimeDealInfoDto.TimeDealInfo> timeDealMap = requestTimeDealIds.isEmpty() ? Collections.emptyMap() :
-                timeDealQueryService.getTimeDeals(requestTimeDealIds).stream()
-                        .collect(Collectors.toMap(TimeDealInfoDto.TimeDealInfo::id, timeDeal -> timeDeal));
 
         Map<Long, CheckoutSession.ProductSnapshot> sessionProducts = new HashMap<>();
         List<CheckoutSession.Item> sessionItems = new ArrayList<>();
@@ -80,18 +71,10 @@ public class OrderService {
                 throw new BusinessException(ErrorCode.OUT_OF_STOCK);
             }
 
-            if (itemRequest.timeDealId() != null) {
-                TimeDealInfoDto.TimeDealInfo timeDeal = timeDealMap.get(itemRequest.timeDealId());
-                if (timeDeal == null) {
-                    throw new BusinessException(ErrorCode.TIMEDEAL_NOT_FOUND);
-                }
-                if (!timeDeal.productId().equals(sku.productId())) {
-                    throw new BusinessException(ErrorCode.INVALID_TIME_DEAL_PRODUCT);
-                }
-                if (!timeDeal.isActive()) {
-                    throw new BusinessException(ErrorCode.TIMEDEAL_NOT_ACTIVE);
-                }
-                if (timeDeal.purchaseLimit() != null && itemRequest.quantity() > timeDeal.purchaseLimit()) {
+            Integer purchaseLimit = productQueryService.getSkuPurchaseLimit(sku.skuId());
+            if (purchaseLimit != null && purchaseLimit > 0) {
+                int alreadyPurchaseCount = redisPurchaseLimitRepository.getCurrentPurchaseCount(sku.skuId(), userId);
+                if (alreadyPurchaseCount + itemRequest.quantity() > purchaseLimit) {
                     throw new BusinessException(ErrorCode.PURCHASE_LIMIT_EXCEEDED);
                 }
             }
@@ -101,7 +84,7 @@ public class OrderService {
 
             sessionProducts.putIfAbsent(sku.productId(), new CheckoutSession.ProductSnapshot(sku.productName(), sku.thumbnailUrl()));
 
-            sessionItems.add(new CheckoutSession.Item(sku.productId(), itemRequest.timeDealId(), sku.skuId(), sku.combinationKey(), itemRequest.quantity(), sku.originUnitPrice(), sku.saleUnitPrice()));
+            sessionItems.add(new CheckoutSession.Item(sku.productId(), sku.skuId(), sku.combinationKey(), itemRequest.quantity(), sku.originUnitPrice(), sku.saleUnitPrice()));
 
             orderItemsByProductId.computeIfAbsent(sku.productId(), k -> new ArrayList<>())
                     .add(new OrderDto.OrderItemResponse(sku.combinationKey(), itemRequest.quantity(), sku.originUnitPrice(), sku.saleUnitPrice()));
