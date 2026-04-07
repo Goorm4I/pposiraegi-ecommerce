@@ -38,6 +38,9 @@ public class ProductSku extends BaseUpdatedEntity {
     @Column(name = "stock_quantity", nullable = false, columnDefinition = "INT DEFAULT 0")
     private Integer stockQuantity;
 
+    @Column(name = "purchase_limit")
+    private Integer purchaseLimit;
+
     @Column(name = "combination_key")
     private String combinationKey;
 

@@ -56,3 +56,7 @@ cors:
   allowed-origins:
     - "http://localhost:3000"
     - "https://pposiraegi.cloud"
+
+pg:
+  success-url: http://localhost:8080/api/v1/orders/success
+  fail-url: http://localhost:8080/api/v1/orders/fail

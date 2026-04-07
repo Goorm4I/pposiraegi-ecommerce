@@ -38,6 +38,7 @@ public enum ErrorCode {
     PRODUCT_IMAGE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "P014", "등록할 수 있는 상품 이미지 개수를 초과했습니다."),
     SKU_NOT_FOUND(HttpStatus.NOT_FOUND, "P004", "해당 상품의 옵션(SKU) 정보를 찾을 수 없습니다."),
     PRODUCT_NOT_ACTIVE(HttpStatus.BAD_REQUEST, "P005", "현재 판매 중이지 않은 상품입니다."),
+    PURCHASE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "P007", "1인당 구매 가능 수량을 초과했습니다."),
 
     SKU_MISMATCH(HttpStatus.BAD_REQUEST, "P006", "상품과 옵션 정보가 일치하지 않습니다."),
     OUT_OF_STOCK(HttpStatus.BAD_REQUEST, "P002", "재고가 부족합니다."),
@@ -46,16 +47,20 @@ public enum ErrorCode {
     // 타임딜 (T)
     TIMEDEAL_NOT_FOUND(HttpStatus.NOT_FOUND, "T001", "타임딜 정보를 찾을 수 없습니다."),
     TIMEDEAL_NOT_ACTIVE(HttpStatus.BAD_REQUEST, "T002", "현재 구매 가능한 타임딜 시간이 아닙니다."),
-    INVALID_TIMEDEAL_START_STATE(HttpStatus.BAD_REQUEST, "T003", "대기 중인 타임딜만 시작할 수 있습니다."),
-    INVALID_TIMEDEAL_END_STATE(HttpStatus.BAD_REQUEST, "T004", "진행 중인 타임딜만 종료할 수 있습니다."),
-    TIMEDEAL_ALREADY_EXPIRED(HttpStatus.BAD_REQUEST, "T005", "이미 종료된 타임딜입니다."),
-    INVALID_TIMEDEAL_TIME_RANGE(HttpStatus.BAD_REQUEST, "T006", "종료 시간은 시작 시간보다 앞설 수 없습니다."),
-    INVALID_TIMEDEAL_START_TIME(HttpStatus.BAD_REQUEST, "T007", "시작 시간은 현재 시간보다 과거일 수 없습니다."),
+    INVALID_TIME_DEAL_PRODUCT(HttpStatus.BAD_REQUEST, "T003", "타임딜 진행중인 상품이 아닙니다."),
+    INVALID_TIMEDEAL_START_STATE(HttpStatus.BAD_REQUEST, "T004", "대기 중인 타임딜만 시작할 수 있습니다."),
+    INVALID_TIMEDEAL_END_STATE(HttpStatus.BAD_REQUEST, "T005", "진행 중인 타임딜만 종료할 수 있습니다."),
+    TIMEDEAL_ALREADY_EXPIRED(HttpStatus.BAD_REQUEST, "T006", "이미 종료된 타임딜입니다."),
+    INVALID_TIMEDEAL_TIME_RANGE(HttpStatus.BAD_REQUEST, "T007", "종료 시간은 시작 시간보다 앞설 수 없습니다."),
+    INVALID_TIMEDEAL_START_TIME(HttpStatus.BAD_REQUEST, "T008", "시작 시간은 현재 시간보다 과거일 수 없습니다."),
 
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "O001", "주문 내역을 찾을 수 없습니다."),
     CHECKOUT_NOT_FOUND(HttpStatus.NOT_FOUND, "O002", "존재하지 않거나 이미 만료된 주문서입니다."),
     CHECKOUT_USER_MISMATCH(HttpStatus.FORBIDDEN, "O003", "주문서의 소유자가 일치하지 않습니다."),
     CHECKOUT_ALREADY_PROCESSED(HttpStatus.GONE, "O004", "이미 결제가 완료되었거나 처리 중인 주문서입니다."),
+    PAYMENT_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "O005", "결제 금액이 실제 주문 금액과 일치하지 않습니다."),
+    ORDER_ALREADY_PROCESSING(HttpStatus.CONFLICT, "O006", "이미 처리 중인 주문 요청입니다."),
+    ORDER_ALREADY_PROCESSED(HttpStatus.BAD_REQUEST, "O007", "이미 처리된 주문 요청입니다."),
 
     COUPON_EXPIRED(HttpStatus.BAD_REQUEST, "M001", "만료된 쿠폰입니다."),
     COUPON_NOT_FOUND(HttpStatus.NOT_FOUND, "M002", "쿠폰을 찾을 수 없습니다.");

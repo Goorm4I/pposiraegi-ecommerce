@@ -2,10 +2,9 @@ package cloud.pposiraegi.ecommerce.domain.order.entity;
 
 import cloud.pposiraegi.ecommerce.domain.order.enums.OrderItemStatus;
 import cloud.pposiraegi.ecommerce.global.common.entity.BaseCreatedEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import cloud.pposiraegi.ecommerce.global.common.exception.BusinessException;
+import cloud.pposiraegi.ecommerce.global.common.exception.ErrorCode;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -26,6 +25,9 @@ public class OrderItem extends BaseCreatedEntity {
 
     @Column(name = "product_id", nullable = false)
     private Long productId;
+
+    @Column(name = "time_deal_id")
+    private Long timeDealId;
 
     @Column(name = "sku_id", nullable = false)
     private Long skuId;
@@ -48,6 +50,7 @@ public class OrderItem extends BaseCreatedEntity {
     @Column(name = "discount_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal discountAmount;
 
+    @Enumerated(EnumType.STRING)
     @Column
     private OrderItemStatus status;
 
@@ -67,5 +70,17 @@ public class OrderItem extends BaseCreatedEntity {
 
     public void registerShipmentId(Long shipmentId) {
         this.shipmentId = shipmentId;
+    }
+
+    public void updateStatus(OrderItemStatus newStatus) {
+        if (newStatus == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        if (this.status == OrderItemStatus.CANCELED) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        this.status = newStatus;
     }
 }

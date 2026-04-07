@@ -15,6 +15,7 @@ public class OrderDto {
     }
 
     public record OrderItemRequest(
+            Long timeDealId,
             @NotNull Long skuId,
             @NotNull @Min(1) Integer quantity
     ) {
@@ -62,9 +63,18 @@ public class OrderDto {
     ) {
     }
 
-
     public record OrderResponse(
-            String checkoutId
+            String orderNumber,
+            String orderName,
+            Long amount,
+            //CustomerInfo customerInfo,
+            PgConfig pgConfig
+    ) {
+    }
+
+    public record PgConfig(
+            String successUrl,
+            String failUrl
     ) {
     }
 }

@@ -2,57 +2,58 @@ package cloud.pposiraegi.ecommerce.domain.order.service;
 
 import cloud.pposiraegi.ecommerce.domain.order.dto.OrderDto;
 import cloud.pposiraegi.ecommerce.domain.order.entity.CheckoutSession;
+import cloud.pposiraegi.ecommerce.domain.order.entity.IdempotencyRecord;
 import cloud.pposiraegi.ecommerce.domain.order.entity.Order;
-import cloud.pposiraegi.ecommerce.domain.order.entity.OrderItem;
-import cloud.pposiraegi.ecommerce.domain.order.generator.OrderNumberGenerator;
-import cloud.pposiraegi.ecommerce.domain.order.repository.OrderItemRepository;
+import cloud.pposiraegi.ecommerce.domain.order.enums.IdempotencyStatus;
+import cloud.pposiraegi.ecommerce.domain.order.repository.IdempotencyRecordRepository;
 import cloud.pposiraegi.ecommerce.domain.order.repository.OrderRepository;
+import cloud.pposiraegi.ecommerce.domain.order.repository.RedisPurchaseLimitRepository;
 import cloud.pposiraegi.ecommerce.domain.product.dto.ProductInfoDto;
 import cloud.pposiraegi.ecommerce.domain.product.service.ProductQueryService;
-import cloud.pposiraegi.ecommerce.domain.product.service.ProductService;
-import cloud.pposiraegi.ecommerce.domain.product.service.ProductStockService;
+import cloud.pposiraegi.ecommerce.domain.product.service.TimeDealQueryService;
 import cloud.pposiraegi.ecommerce.domain.user.user.service.UserAddressQueryService;
 import cloud.pposiraegi.ecommerce.global.common.exception.BusinessException;
 import cloud.pposiraegi.ecommerce.global.common.exception.ErrorCode;
 import com.github.f4b6a3.tsid.TsidFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.security.MessageDigest;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderService {
-    private final RedisTemplate<String, Object> redisTemplate;
-    private final OrderRepository orderRepository;
+
     private final TsidFactory tsidFactory;
     private final ProductQueryService productQueryService;
+    private final TimeDealQueryService timeDealQueryService;
 
-    private static final String REDIS_KEY_PREFIX = "checkout:session:";
     private final UserAddressQueryService userAddressQueryService;
-    private final OrderItemRepository orderItemRepository;
-    private final ProductStockService productStockService;
-    private final ProductService productService;
+    private final OrderTransactionProcessor orderTransactionProcessor;
+    private final ObjectMapper objectMapper;
+    private final IdempotencyRecordRepository idempotencyRecordRepository;
+    private final RedissonClient redissonClient;
+    private final CheckoutSessionService checkoutSessionService;
+    private final RedisPurchaseLimitRepository redisPurchaseLimitRepository;
+    private final OrderRepository orderRepository;
 
     @Transactional(readOnly = true)
     public OrderDto.OrderSheetResponse createOrderSheet(Long userId, OrderDto.OrderSheetRequest request) {
         Long checkoutId = tsidFactory.create().toLong();
         BigDecimal totalAmount = BigDecimal.ZERO;
 
-        List<Long> requestSkuIds = request.orderItems().stream().
-                map(OrderDto.OrderItemRequest::skuId)
+        List<Long> requestSkuIds = request.orderItems().stream()
+                .map(OrderDto.OrderItemRequest::skuId)
                 .toList();
 
         Map<Long, ProductInfoDto.ProductAndSkuInfo> skuMap = productQueryService.getSkuInfos(requestSkuIds).stream()
@@ -73,10 +74,19 @@ public class OrderService {
                 throw new BusinessException(ErrorCode.OUT_OF_STOCK);
             }
 
+            Integer purchaseLimit = productQueryService.getSkuPurchaseLimit(sku.skuId());
+            if (purchaseLimit != null && purchaseLimit > 0) {
+                int alreadyPurchaseCount = redisPurchaseLimitRepository.getCurrentPurchaseCount(sku.skuId(), userId);
+                if (alreadyPurchaseCount + itemRequest.quantity() > purchaseLimit) {
+                    throw new BusinessException(ErrorCode.PURCHASE_LIMIT_EXCEEDED);
+                }
+            }
+
             BigDecimal lineAmount = sku.saleUnitPrice().multiply(BigDecimal.valueOf(itemRequest.quantity()));
             totalAmount = totalAmount.add(lineAmount);
 
             sessionProducts.putIfAbsent(sku.productId(), new CheckoutSession.ProductSnapshot(sku.productName(), sku.thumbnailUrl()));
+
             sessionItems.add(new CheckoutSession.Item(sku.productId(), sku.skuId(), sku.combinationKey(), itemRequest.quantity(), sku.originUnitPrice(), sku.saleUnitPrice()));
 
             orderItemsByProductId.computeIfAbsent(sku.productId(), k -> new ArrayList<>())
@@ -91,7 +101,7 @@ public class OrderService {
                 )).toList();
 
         CheckoutSession checkoutSession = new CheckoutSession(checkoutId, userId, sessionProducts, sessionItems, totalAmount);
-        redisTemplate.opsForValue().set(REDIS_KEY_PREFIX + checkoutId, checkoutSession, Duration.ofMinutes(15));
+        checkoutSessionService.saveSession(checkoutId, checkoutSession, 15);
 
         return new OrderDto.OrderSheetResponse(
                 checkoutId.toString(),
@@ -102,7 +112,7 @@ public class OrderService {
     }
 
     public OrderDto.OrderSheetResponse getOrderSheet(Long userId, Long checkoutId) {
-        CheckoutSession session = getCheckoutSession(checkoutId);
+        CheckoutSession session = checkoutSessionService.getCheckoutSession(checkoutId);
 
         if (!session.userId().equals(userId)) {
             throw new BusinessException(ErrorCode.CHECKOUT_USER_MISMATCH);
@@ -135,78 +145,75 @@ public class OrderService {
         );
     }
 
-    @Transactional
-    public OrderDto.OrderResponse createOrder(Long userId, OrderDto.OrderRequest request) {
-        CheckoutSession session = getCheckoutSession(request.checkoutId());
+    public OrderDto.OrderResponse createOrder(String idempotencyKey, Long userId, OrderDto.OrderRequest request) {
+        String requestHash = generateRequestHash(request);
+        RLock lock = redissonClient.getLock("lock:order:" + request.checkoutId());
 
-        if (!session.userId().equals(userId)) {
-            throw new BusinessException(ErrorCode.CHECKOUT_USER_MISMATCH);
-        }
+        try {
+            boolean isLocked = lock.tryLock(2, 5, TimeUnit.SECONDS);
+            if (!isLocked) {
+                throw new BusinessException(ErrorCode.HANDLE_ACCESS_DENIED);
+            }
 
-        Long orderId = tsidFactory.create().toLong();
-
-        Order order = Order.builder()
-                .id(orderId)
-                .userId(userId)
-                .checkoutId(request.checkoutId())
-                .orderNumber(OrderNumberGenerator.getInstance().generate())
-                .totalAmount(session.totalAmount())
-                .build();
-
-        List<OrderItem> orderItems = new ArrayList<>();
-        Map<Long, Integer> stockDecreaseRequests = new HashMap<>();
-
-        orderRepository.save(order);
-
-        for (CheckoutSession.Item item : session.orderItems()) {
-            OrderItem orderItem = OrderItem.builder()
-                    .id(tsidFactory.create().toLong())
-                    .orderId(orderId)
-                    .productId(item.productId())
-                    .skuId(item.skuId())
-                    .productName(session.products().get(item.productId()).name())
-                    .skuName(item.optionCombination())
-                    .quantity(item.quantity())
-                    .unitPrice(item.saleUnitPrice())
-                    .discountAmount(BigDecimal.ZERO)
-                    .build();
-
-            stockDecreaseRequests.put(item.skuId(), item.quantity());
-
-            orderItems.add(orderItem);
-        }
-
-        orderItemRepository.saveAll(orderItems);
-
-        productStockService.decreaseStocks(stockDecreaseRequests);
-
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCompletion(int status) {
-                if (status == STATUS_ROLLED_BACK) {
+            Optional<IdempotencyRecord> recordOpt = idempotencyRecordRepository.findById(idempotencyKey);
+            if (recordOpt.isPresent()) {
+                IdempotencyRecord existingRecord = recordOpt.get();
+                if (!existingRecord.getRequestHash().equals(requestHash)) {
+                    throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+                }
+                if (IdempotencyStatus.SUCCESS.equals(existingRecord.getStatus())) {
                     try {
-                        log.warn("주문 DB 저장 실패, Redis 재고 복구 시도");
-                        productStockService.increaseStocks(stockDecreaseRequests);
+                        return objectMapper.readValue(existingRecord.getResponsePayload(), OrderDto.OrderResponse.class);
                     } catch (Exception e) {
-                        log.error("CRITICAL: Redis 재고 복구 실패", e);
+                        throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
                     }
                 }
+                if (IdempotencyStatus.PENDING.equals(existingRecord.getStatus())) {
+                    throw new BusinessException(ErrorCode.ORDER_ALREADY_PROCESSING);
+                }
             }
-        });
 
-        return new OrderDto.OrderResponse(orderId.toString());
+            return orderTransactionProcessor.executeCreateOrder(idempotencyKey, userId, request, requestHash);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
+        } finally {
+            if (lock.isLocked() && lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
     }
 
-    private CheckoutSession getCheckoutSession(Long checkoutId) {
-        String redisKey = REDIS_KEY_PREFIX + checkoutId;
-        CheckoutSession checkoutSession = (CheckoutSession) redisTemplate.opsForValue().get(redisKey);
+    public void confirmPayment(String paymentKey, String orderNumber, BigDecimal amount, Long userId) {
+        Order order = orderRepository.findByOrderNumber(orderNumber)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
 
-        if (checkoutSession == null) {
-            throw new BusinessException(ErrorCode.CHECKOUT_NOT_FOUND);
+        if (!order.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.HANDLE_ACCESS_DENIED);
         }
 
-        return checkoutSession;
+        if (order.getTotalAmount().compareTo(amount) != 0) {
+            throw new BusinessException(ErrorCode.PAYMENT_AMOUNT_MISMATCH);
+        }
+
+        // TODO: 외부 PG 승인 API 호출 로직
+
+        orderTransactionProcessor.completeOrder(order.getId());
+
+        checkoutSessionService.deleteSession(order.getCheckoutId());
     }
+
+    public void failPayment(Long orderNumber, String code, String message, Long userId) {
+        Order order = orderRepository.findById(orderNumber)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+
+        if (!order.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.HANDLE_ACCESS_DENIED);
+        }
+
+        orderTransactionProcessor.cancelPendingOrder(order.getId(), userId);
+    }
+
 
     private OrderDto.ShippingAddressResponse getUserShippingAddress(Long userId) {
         var lastUsedAddress = userAddressQueryService.getLastUsedAddress(userId);
@@ -224,5 +231,21 @@ public class OrderService {
                 lastUsedAddress.secondaryPhoneNumber(),
                 lastUsedAddress.requestMessage()
         );
+    }
+
+    private String generateRequestHash(OrderDto.OrderRequest request) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256")
+                    .digest(objectMapper.writeValueAsBytes(request));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }
