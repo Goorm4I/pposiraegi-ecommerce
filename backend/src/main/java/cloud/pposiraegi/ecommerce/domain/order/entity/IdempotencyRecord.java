@@ -10,6 +10,8 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Entity
 @Table(name = "idempotency_records")
@@ -29,8 +31,11 @@ public class IdempotencyRecord extends BaseUpdatedEntity {
     private String responsePayload;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status")
+    @Column(name = "status", nullable = false)
     private IdempotencyStatus status;
+
+    @Column(name = "expired_at", nullable = false)
+    private LocalDateTime expiredAt;
 
     @Builder
     public IdempotencyRecord(String id, String handlerName, String requestHash) {
@@ -38,6 +43,7 @@ public class IdempotencyRecord extends BaseUpdatedEntity {
         this.handlerName = handlerName;
         this.requestHash = requestHash;
         this.status = IdempotencyStatus.PENDING;
+        this.expiredAt = LocalDateTime.now().plusDays(1);
     }
 
     public void updateResponse(IdempotencyStatus status, String responsePayload) {

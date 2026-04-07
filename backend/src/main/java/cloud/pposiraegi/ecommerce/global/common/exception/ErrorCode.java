@@ -58,6 +58,9 @@ public enum ErrorCode {
     CHECKOUT_NOT_FOUND(HttpStatus.NOT_FOUND, "O002", "존재하지 않거나 이미 만료된 주문서입니다."),
     CHECKOUT_USER_MISMATCH(HttpStatus.FORBIDDEN, "O003", "주문서의 소유자가 일치하지 않습니다."),
     CHECKOUT_ALREADY_PROCESSED(HttpStatus.GONE, "O004", "이미 결제가 완료되었거나 처리 중인 주문서입니다."),
+    PAYMENT_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "O005", "결제 금액이 실제 주문 금액과 일치하지 않습니다."),
+    ORDER_ALREADY_PROCESSING(HttpStatus.CONFLICT, "O006", "이미 처리 중인 주문 요청입니다."),
+    ORDER_ALREADY_PROCESSED(HttpStatus.BAD_REQUEST, "O007", "이미 처리된 주문 요청입니다."),
 
     COUPON_EXPIRED(HttpStatus.BAD_REQUEST, "M001", "만료된 쿠폰입니다."),
     COUPON_NOT_FOUND(HttpStatus.NOT_FOUND, "M002", "쿠폰을 찾을 수 없습니다.");

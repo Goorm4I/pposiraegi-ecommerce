@@ -6,6 +6,7 @@ import cloud.pposiraegi.ecommerce.domain.order.entity.IdempotencyRecord;
 import cloud.pposiraegi.ecommerce.domain.order.entity.Order;
 import cloud.pposiraegi.ecommerce.domain.order.entity.OrderItem;
 import cloud.pposiraegi.ecommerce.domain.order.enums.IdempotencyStatus;
+import cloud.pposiraegi.ecommerce.domain.order.enums.OrderItemStatus;
 import cloud.pposiraegi.ecommerce.domain.order.enums.OrderStatus;
 import cloud.pposiraegi.ecommerce.domain.order.generator.OrderNumberGenerator;
 import cloud.pposiraegi.ecommerce.domain.order.repository.IdempotencyRecordRepository;
@@ -45,6 +46,7 @@ public class OrderTransactionProcessor {
     private final ObjectMapper objectMapper;
     private final ProductQueryService productQueryService;
     private final RedisPurchaseLimitRepository redisPurchaseLimitRepository;
+    private final OrderNumberGenerator orderNumberGenerator;
 
     @Value("${pg.success-url}")
     private String pgSuccessUrl;
@@ -75,7 +77,7 @@ public class OrderTransactionProcessor {
                 .id(orderId)
                 .userId(userId)
                 .checkoutId(request.checkoutId())
-                .orderNumber(OrderNumberGenerator.getInstance().generate())
+                .orderNumber(orderNumberGenerator.generate())
                 .totalAmount(session.totalAmount())
                 .build();
 
@@ -162,7 +164,7 @@ public class OrderTransactionProcessor {
         OrderDto.PgConfig pgConfig = new OrderDto.PgConfig(pgSuccessUrl, pgFailUrl);
 
         OrderDto.OrderResponse response = new OrderDto.OrderResponse(
-                order.getOrderNumber().toString(),
+                order.getOrderNumber(),
                 orderName,
                 order.getTotalAmount().longValue(),
                 pgConfig
@@ -178,30 +180,60 @@ public class OrderTransactionProcessor {
     }
 
     private void cancelExistingPendingOrders(Long userId) {
-        List<Order> pendingOrders = orderRepository.findByUserIdAndStatus(userId, OrderStatus.PENDING);
+        List<Order> pendingOrders = orderRepository.findByUserIdAndStatus(userId, OrderStatus.PENDING_PAYMENT);
 
         for (Order pendingOrder : pendingOrders) {
-            pendingOrder.updateStatus(OrderStatus.CANCELED);
-
-            List<OrderItem> items = orderItemRepository.findByOrderId(pendingOrder.getId());
-            Map<Long, Integer> stockRestoreRequest = new HashMap<>();
-            Map<Long, Integer> purchaseLimitRestoreRequest = new HashMap<>();
-
-            for (OrderItem item : items) {
-                stockRestoreRequest.put(item.getSkuId(), item.getQuantity());
-
-                Integer limit = productQueryService.getSkuPurchaseLimit(item.getSkuId());
-                if (limit != null && limit > 0) {
-                    purchaseLimitRestoreRequest.merge(item.getSkuId(), item.getQuantity(), Integer::sum);
-                }
-
-            }
-
-            productStockService.increaseStocks(stockRestoreRequest);
-
-            purchaseLimitRestoreRequest.forEach((skuId, qty) -> {
-                redisPurchaseLimitRepository.decreasePurchaseCount(skuId, userId, qty);
-            });
+            processOrderCancellation(pendingOrder, userId);
         }
     }
+
+    @Transactional
+    public void completeOrder(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+
+        order.updateStatus(OrderStatus.PAID);
+
+        List<OrderItem> items = orderItemRepository.findByOrderId(orderId);
+        for (OrderItem item : items) {
+            item.updateStatus(OrderItemStatus.PAID);
+        }
+    }
+
+    @Transactional
+    public void cancelPendingOrder(Long orderId, Long userId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+
+        if (OrderStatus.PENDING_PAYMENT.equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_ALREADY_PROCESSED);
+        }
+
+        processOrderCancellation(order, userId);
+    }
+
+    private void processOrderCancellation(Order order, Long userId) {
+        order.updateStatus(OrderStatus.CANCELED);
+
+        List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
+        Map<Long, Integer> stockRestoreRequest = new HashMap<>();
+        Map<Long, Integer> purchaseLimitRestoreRequest = new HashMap<>();
+
+        for (OrderItem item : items) {
+            item.updateStatus(OrderItemStatus.CANCELED);
+            stockRestoreRequest.put(item.getSkuId(), item.getQuantity());
+
+            Integer limit = productQueryService.getSkuPurchaseLimit(item.getSkuId());
+            if (limit != null && limit > 0) {
+                purchaseLimitRestoreRequest.merge(item.getSkuId(), item.getQuantity(), Integer::sum);
+            }
+        }
+
+        productStockService.increaseStocks(stockRestoreRequest);
+
+        purchaseLimitRestoreRequest.forEach((skuId, qty) -> {
+            redisPurchaseLimitRepository.decreasePurchaseCount(skuId, userId, qty);
+        });
+    }
+
 }

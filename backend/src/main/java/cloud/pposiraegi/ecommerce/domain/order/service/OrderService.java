@@ -3,8 +3,10 @@ package cloud.pposiraegi.ecommerce.domain.order.service;
 import cloud.pposiraegi.ecommerce.domain.order.dto.OrderDto;
 import cloud.pposiraegi.ecommerce.domain.order.entity.CheckoutSession;
 import cloud.pposiraegi.ecommerce.domain.order.entity.IdempotencyRecord;
+import cloud.pposiraegi.ecommerce.domain.order.entity.Order;
 import cloud.pposiraegi.ecommerce.domain.order.enums.IdempotencyStatus;
 import cloud.pposiraegi.ecommerce.domain.order.repository.IdempotencyRecordRepository;
+import cloud.pposiraegi.ecommerce.domain.order.repository.OrderRepository;
 import cloud.pposiraegi.ecommerce.domain.order.repository.RedisPurchaseLimitRepository;
 import cloud.pposiraegi.ecommerce.domain.product.dto.ProductInfoDto;
 import cloud.pposiraegi.ecommerce.domain.product.service.ProductQueryService;
@@ -43,6 +45,7 @@ public class OrderService {
     private final RedissonClient redissonClient;
     private final CheckoutSessionService checkoutSessionService;
     private final RedisPurchaseLimitRepository redisPurchaseLimitRepository;
+    private final OrderRepository orderRepository;
 
     @Transactional(readOnly = true)
     public OrderDto.OrderSheetResponse createOrderSheet(Long userId, OrderDto.OrderSheetRequest request) {
@@ -144,7 +147,7 @@ public class OrderService {
 
     public OrderDto.OrderResponse createOrder(String idempotencyKey, Long userId, OrderDto.OrderRequest request) {
         String requestHash = generateRequestHash(request);
-        RLock lock = redissonClient.getLock("lock:idempotency:" + idempotencyKey);
+        RLock lock = redissonClient.getLock("lock:order:" + request.checkoutId());
 
         try {
             boolean isLocked = lock.tryLock(2, 5, TimeUnit.SECONDS);
@@ -153,18 +156,20 @@ public class OrderService {
             }
 
             Optional<IdempotencyRecord> recordOpt = idempotencyRecordRepository.findById(idempotencyKey);
-
             if (recordOpt.isPresent()) {
                 IdempotencyRecord existingRecord = recordOpt.get();
                 if (!existingRecord.getRequestHash().equals(requestHash)) {
                     throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
                 }
-                if (existingRecord.getStatus() == IdempotencyStatus.SUCCESS) {
+                if (IdempotencyStatus.SUCCESS.equals(existingRecord.getStatus())) {
                     try {
                         return objectMapper.readValue(existingRecord.getResponsePayload(), OrderDto.OrderResponse.class);
                     } catch (Exception e) {
                         throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
                     }
+                }
+                if (IdempotencyStatus.PENDING.equals(existingRecord.getStatus())) {
+                    throw new BusinessException(ErrorCode.ORDER_ALREADY_PROCESSING);
                 }
             }
 
@@ -177,6 +182,36 @@ public class OrderService {
                 lock.unlock();
             }
         }
+    }
+
+    public void confirmPayment(String paymentKey, String orderNumber, BigDecimal amount, Long userId) {
+        Order order = orderRepository.findByOrderNumber(orderNumber)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+
+        if (!order.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.HANDLE_ACCESS_DENIED);
+        }
+
+        if (order.getTotalAmount().compareTo(amount) != 0) {
+            throw new BusinessException(ErrorCode.PAYMENT_AMOUNT_MISMATCH);
+        }
+
+        // TODO: 외부 PG 승인 API 호출 로직
+
+        orderTransactionProcessor.completeOrder(order.getId());
+
+        checkoutSessionService.deleteSession(order.getCheckoutId());
+    }
+
+    public void failPayment(Long orderNumber, String code, String message, Long userId) {
+        Order order = orderRepository.findById(orderNumber)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+
+        if (!order.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.HANDLE_ACCESS_DENIED);
+        }
+
+        orderTransactionProcessor.cancelPendingOrder(order.getId(), userId);
     }
 
 

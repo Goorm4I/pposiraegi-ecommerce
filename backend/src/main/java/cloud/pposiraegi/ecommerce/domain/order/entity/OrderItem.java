@@ -2,6 +2,8 @@ package cloud.pposiraegi.ecommerce.domain.order.entity;
 
 import cloud.pposiraegi.ecommerce.domain.order.enums.OrderItemStatus;
 import cloud.pposiraegi.ecommerce.global.common.entity.BaseCreatedEntity;
+import cloud.pposiraegi.ecommerce.global.common.exception.BusinessException;
+import cloud.pposiraegi.ecommerce.global.common.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -68,5 +70,17 @@ public class OrderItem extends BaseCreatedEntity {
 
     public void registerShipmentId(Long shipmentId) {
         this.shipmentId = shipmentId;
+    }
+
+    public void updateStatus(OrderItemStatus newStatus) {
+        if (newStatus == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        if (this.status == OrderItemStatus.CANCELED) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        this.status = newStatus;
     }
 }

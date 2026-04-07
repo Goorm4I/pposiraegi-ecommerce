@@ -1,41 +1,31 @@
 package cloud.pposiraegi.ecommerce.domain.order.generator;
 
-import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import org.redisson.api.RAtomicLong;
+import org.redisson.api.RedissonClient;
+import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.concurrent.atomic.AtomicLong;
 
+@Component
+@RequiredArgsConstructor
 public class OrderNumberGenerator {
-    @Getter
-    private static final OrderNumberGenerator instance = new OrderNumberGenerator();
+    private final RedissonClient redissonClient;
+    private static final String REDIS_ORDER_NUMBER_KEY_PREFIX = "order:number:";
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
-    private final AtomicLong counter;
-    private volatile String currentDateStr;
+    public String generate() {
+        String today = LocalDate.now().format(DATE_FORMATTER);
+        String redisKey = REDIS_ORDER_NUMBER_KEY_PREFIX + today;
 
-    private OrderNumberGenerator() {
-        this.counter = new AtomicLong(0);
-        this.currentDateStr = getCurrentDateStr();
-    }
+        RAtomicLong sequence = redissonClient.getAtomicLong(redisKey);
 
-    public Long generate() {
-        String today = getCurrentDateStr();
-
-        if (!today.equals(this.currentDateStr)) {
-            synchronized (this) {
-                if (!today.equals(this.currentDateStr)) {
-                    this.counter.set(0);
-                    this.currentDateStr = today;
-                }
-            }
+        if (!sequence.isExists()) {
+            sequence.expire(java.time.Duration.ofDays(1));
         }
 
-        long sequence = counter.incrementAndGet();
-        return Long.parseLong(String.format("%s-%08d", this.currentDateStr, sequence));
+        Long nextVal = sequence.incrementAndGet();
+        return String.format("%s-%08d", today, nextVal);
     }
-
-    private String getCurrentDateStr() {
-        return LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-    }
-
 }
