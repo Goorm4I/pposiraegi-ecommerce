@@ -3,6 +3,11 @@ output "cloudfront_url" {
   value       = "https://${aws_cloudfront_distribution.frontend.domain_name}"
 }
 
+output "cloudfront_id" {
+  description = "CloudFront Distribution ID (캐시 무효화용)"
+  value       = aws_cloudfront_distribution.frontend.id
+}
+
 output "alb_dns" {
   description = "백엔드 ALB DNS (API 직접 접근용)"
   value       = "http://${aws_lb.alb.dns_name}"
