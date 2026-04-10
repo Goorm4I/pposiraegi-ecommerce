@@ -13,9 +13,9 @@ output "s3_bucket_name" {
   value       = aws_s3_bucket.frontend.bucket
 }
 
-output "ecr_repository_url" {
-  description = "백엔드 ECR 레포지토리 URL"
-  value       = aws_ecr_repository.backend.repository_url
+output "ecr_repository_urls" {
+  description = "백엔드 MSA ECR 레포지토리 URL 목록"
+  value       = { for k, v in aws_ecr_repository.msa : k => v.repository_url }
 }
 
 output "frontend_deploy_command" {
@@ -24,8 +24,8 @@ output "frontend_deploy_command" {
 }
 
 output "backend_push_command" {
-  description = "백엔드 ECR 푸시 예시 명령어"
-  value       = "docker tag backend:latest ${aws_ecr_repository.backend.repository_url}:latest && docker push ${aws_ecr_repository.backend.repository_url}:latest"
+  description = "백엔드 ECR 푸시 예시 명령어 (api-gateway 예시)"
+  value       = "docker tag api-gateway:latest ${aws_ecr_repository.msa["api-gateway"].repository_url}:latest && docker push ${aws_ecr_repository.msa["api-gateway"].repository_url}:latest"
 }
 
 output "elasticache_endpoint" {

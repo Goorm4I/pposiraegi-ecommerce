@@ -212,6 +212,13 @@ resource "aws_security_group" "backend_sg" {
     security_groups = [aws_security_group.alb_sg.id]
   }
 
+  ingress {
+    from_port = 8080
+    to_port   = 8080
+    protocol  = "tcp"
+    self      = true
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -491,11 +498,17 @@ resource "aws_elasticache_cluster" "redis" {
 }
 
 
+
 ###############################################################
-# ECR Repository
+# ECR Repositories (MSA)
 ###############################################################
-resource "aws_ecr_repository" "backend" {
-  name                 = "${var.project_name}-backend"
+locals {
+  services = toset(["api-gateway", "user-service", "product-service", "order-service"])
+}
+
+resource "aws_ecr_repository" "msa" {
+  for_each             = local.services
+  name                 = "${var.project_name}-${each.key}"
   image_tag_mutability = "MUTABLE"
   force_delete         = true
 
@@ -505,20 +518,21 @@ resource "aws_ecr_repository" "backend" {
 }
 
 ###############################################################
-# ECS Cluster & CloudWatch Logs
+# CloudWatch Logs (MSA)
 ###############################################################
-resource "aws_cloudwatch_log_group" "backend" {
-  name              = "/ecs/${var.project_name}-backend"
+resource "aws_cloudwatch_log_group" "msa" {
+  for_each          = local.services
+  name              = "/ecs/${var.project_name}-${each.key}"
   retention_in_days = 7
 }
 
+###############################################################
+# ECS Cluster & IAM Roles
+###############################################################
 resource "aws_ecs_cluster" "main" {
   name = "${var.project_name}-cluster"
 }
 
-###############################################################
-# ECS IAM Roles
-###############################################################
 resource "aws_iam_role" "ecs_task_execution_role" {
   name = "${var.project_name}-ecs-task-execution-role"
   assume_role_policy = jsonencode({
@@ -549,10 +563,41 @@ resource "aws_iam_role" "ecs_task_role" {
 }
 
 ###############################################################
-# ECS Task Definition (Fargate)
+# AWS Cloud Map (Service Discovery)
 ###############################################################
-resource "aws_ecs_task_definition" "backend" {
-  family                   = "${var.project_name}-backend"
+resource "aws_service_discovery_private_dns_namespace" "internal" {
+  name        = "pposiraegi.internal"
+  description = "Private DNS namespace for microservices"
+  vpc         = aws_vpc.main.id
+}
+
+resource "aws_service_discovery_service" "msa" {
+  for_each = local.services
+
+  name = each.key
+
+  dns_config {
+    namespace_id = aws_service_discovery_private_dns_namespace.internal.id
+
+    dns_records {
+      ttl  = 10
+      type = "A"
+    }
+
+    routing_policy = "MULTIVALUE"
+  }
+
+  health_check_custom_config {
+    failure_threshold = 1
+  }
+}
+
+###############################################################
+# ECS Task Definitions (MSA)
+###############################################################
+resource "aws_ecs_task_definition" "msa" {
+  for_each                 = local.services
+  family                   = "${var.project_name}-${each.key}"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = 512
@@ -561,8 +606,8 @@ resource "aws_ecs_task_definition" "backend" {
   task_role_arn            = aws_iam_role.ecs_task_role.arn
 
   container_definitions = jsonencode([{
-    name      = "backend"
-    image     = "${aws_ecr_repository.backend.repository_url}:latest"
+    name      = each.key
+    image     = "${aws_ecr_repository.msa[each.key].repository_url}:latest"
     essential = true
     portMappings = [{
       containerPort = 8080
@@ -575,12 +620,15 @@ resource "aws_ecs_task_definition" "backend" {
       { name = "DB_PASSWORD", value = var.db_password },
       { name = "REDIS_HOST", value = aws_elasticache_cluster.redis.cache_nodes[0].address },
       { name = "JWT_SECRET", value = var.jwt_secret },
-      { name = "CORS_ALLOWED_ORIGINS", value = "https://${aws_cloudfront_distribution.frontend.domain_name}" }
+      { name = "CORS_ALLOWED_ORIGINS", value = "https://${aws_cloudfront_distribution.frontend.domain_name}" },
+      { name = "USER_SERVICE_URL", value = "http://user-service.pposiraegi.internal:8080" },
+      { name = "PRODUCT_SERVICE_URL", value = "http://product-service.pposiraegi.internal:8080" },
+      { name = "ORDER_SERVICE_URL", value = "http://order-service.pposiraegi.internal:8080" }
     ]
     logConfiguration = {
       logDriver = "awslogs"
       options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.backend.name
+        "awslogs-group"         = aws_cloudwatch_log_group.msa[each.key].name
         "awslogs-region"        = var.region
         "awslogs-stream-prefix" = "ecs"
       }
@@ -589,12 +637,13 @@ resource "aws_ecs_task_definition" "backend" {
 }
 
 ###############################################################
-# ECS Service
+# ECS Services (MSA)
 ###############################################################
-resource "aws_ecs_service" "backend" {
-  name            = "${var.project_name}-backend-service"
+resource "aws_ecs_service" "msa" {
+  for_each        = local.services
+  name            = "${var.project_name}-${each.key}-service"
   cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.backend.arn
+  task_definition = aws_ecs_task_definition.msa[each.key].arn
   launch_type     = "FARGATE"
   desired_count   = 1
 
@@ -604,10 +653,18 @@ resource "aws_ecs_service" "backend" {
     assign_public_ip = false
   }
 
-  load_balancer {
-    target_group_arn = aws_lb_target_group.backend_tg.arn
-    container_name   = "backend"
-    container_port   = 8080
+  service_registries {
+    registry_arn = aws_service_discovery_service.msa[each.key].arn
+  }
+
+  # api-gateway만 ALB에 연결
+  dynamic "load_balancer" {
+    for_each = each.key == "api-gateway" ? [1] : []
+    content {
+      target_group_arn = aws_lb_target_group.backend_tg.arn
+      container_name   = each.key
+      container_port   = 8080
+    }
   }
 
   depends_on = [
