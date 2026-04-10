@@ -1,0 +1,16 @@
+services:
+  frontend-dev:
+    build: 
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+    environment:
+      # 도커 환경에서 파일 변경 감지를 원활하게 하기 위한 설정 (CRA)
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    stdin_open: true # React 개발 서버가 백그라운드에서 종료되지 않도록 유지
+    tty: true

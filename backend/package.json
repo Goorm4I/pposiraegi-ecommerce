@@ -1,0 +1,9 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "./gradlew build -x test",
+    "test": "./gradlew test"
+  }
+}

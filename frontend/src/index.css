@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
+@layer base {
+  body {
+    @apply bg-brand-50 text-brand-800 font-sans antialiased;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-brand-500 text-white font-semibold 
+           py-3 px-6 rounded-2xl shadow-soft
+           hover:bg-brand-400 hover:shadow-medium
+           active:scale-[0.98]
+           transition-all duration-200;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-brand-800 font-semibold 
+           py-3 px-6 rounded-2xl border border-brand-200
+           hover:bg-brand-100 hover:border-brand-300
+           transition-all duration-200;
+  }
+
+  .card {
+    @apply bg-white rounded-3xl shadow-soft 
+           border border-brand-200/50
+           hover:shadow-medium hover:-translate-y-1
+           transition-all duration-300;
+  }
+
+  .badge {
+    @apply px-3 py-1 rounded-full text-sm font-medium;
+  }
+
+  .badge-live {
+    @apply bg-brand-500 text-white;
+  }
+
+  .badge-upcoming {
+    @apply bg-brand-300 text-brand-800;
+  }
+
+  .badge-soldout {
+    @apply bg-brand-200 text-brand-600;
+  }
+
+  /* 메쉬 그라데이션 배경 */
+  .bg-mesh {
+    background: 
+      radial-gradient(at 40% 20%, rgba(212, 165, 116, 0.12) 0px, transparent 50%),
+      radial-gradient(at 80% 0%, rgba(139, 115, 85, 0.08) 0px, transparent 50%),
+      radial-gradient(at 0% 50%, rgba(232, 228, 223, 0.6) 0px, transparent 50%),
+      radial-gradient(at 80% 80%, rgba(212, 165, 116, 0.08) 0px, transparent 50%);
+  }
+}
+
+/* 스크롤바 */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F5F3F0;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D4D0CC;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B8B4AF;
+}
+
+/* 슬라이드 업 애니메이션 */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
