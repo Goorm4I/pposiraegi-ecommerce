@@ -9,8 +9,24 @@ variable "aws_profile" {
 
 variable "region" {
   description = "AWS region"
-  default     = "ap-southeast-2"
+  default     = "ap-northeast-2"
 }
+
+variable "github_repo" {
+  description = "GitHub repository name (format: owner/repo)"
+  default     = "Goorm4I/pposiraegi-ecommerce-msa"
+}
+
+variable "github_branch" {
+  description = "GitHub branch to trigger the pipeline"
+  default     = "main"
+}
+
+variable "codestar_connection_arn" {
+  description = "CodeStar Connection ARN for GitHub"
+  default     = "arn:aws:codestar-connections:ap-northeast-2:779846782353:connection/32810379-5f7a-417a-ae07-adc899935e6e"
+}
+
 
 variable "project_name" {
   description = "Project name prefix for resource naming"
