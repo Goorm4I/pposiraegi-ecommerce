@@ -8,6 +8,20 @@ spring:
       server:
         webflux:
           globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOrigins: "http://localhost:3000"
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - PATCH
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders: "*"
+                exposedHeaders:
+                  - Authorization
+                allowCredentials: true
           routes:
             - id: user-service-public
               uri: ${USER_SERVICE_URL}
@@ -31,8 +45,7 @@ spring:
             - id: product-service
               uri: ${PRODUCT_SERVICE_URL}
               predicates:
-                - Path=/api/v1/products/**
-                - Path=/api/v1/admin/products/**
+                - Path=/api/v1/products/**, /api/v1/admin/products/**
 
 jwt:
   secret: ${JWT_SECRET:iqe7Fa7xrhXwJ5SLoee88Yg7DeUuJflj4+IE/XIl81tmZ24qNd4tCUble1Zk2drO=}

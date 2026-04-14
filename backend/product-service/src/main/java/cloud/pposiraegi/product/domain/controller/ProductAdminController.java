@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProductAdminController {
     private final ProductService productService;
 
-    @PostMapping("/register")
+    @PostMapping
     public ApiResponse<Void> createProduct(@Valid @RequestBody ProductDto.ProductCreateRequest request) {
         productService.createProduct(request);
         return ApiResponse.success(null);
