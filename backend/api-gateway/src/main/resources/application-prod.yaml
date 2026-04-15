@@ -6,10 +6,7 @@ spring:
           globalcors:
             cors-configurations:
               '[/**]':
-                allowedOrigins:
-                  - "https://pposiraegi.cloud"
-                  - "https://www.pposiraegi.cloud"
-                  - "${CORS_ALLOWED_ORIGINS}"
+                allowedOriginPatterns: "*"
                 allowedMethods:
                   - GET
                   - POST
