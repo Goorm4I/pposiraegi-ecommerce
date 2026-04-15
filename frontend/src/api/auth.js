@@ -45,7 +45,7 @@ export const register = async ({ email, password, name, phone }) => {
     return userData;
   }
 
-  await axios.post(`${API_BASE_URL}/api/v1/users`, { email, password, name, phoneNumber: phone });
+  await axios.post(`${API_BASE_URL}/api/v1/users/register`, { email, password, name, nickname: name, phoneNumber: phone });
   // 가입 후 자동 로그인: JWT 토큰 발급 + user 저장
   const loginRes = await axios.post(`${API_BASE_URL}/api/v1/auth/login`, { email, password });
   const { accessToken, refreshToken } = loginRes.data.data;
