@@ -41,7 +41,7 @@ export const submitOrder = async (checkoutId, shippingAddressId, paymentMethod, 
   }
 
   // Snowflake ID 정밀도 손실 방지: raw JSON string으로 전송
-  const addressPart = shippingAddressId != null ? `"${shippingAddressId}"` : 'null';
+  const addressPart = shippingAddressId != null ? shippingAddressId : 'null';
   const res = await axios.post(
     `${API_BASE_URL}/api/v1/orders/submit`,
     `{"checkoutId":${checkoutId},"shippingAddressId":${addressPart},"paymentMethod":"${paymentMethod}","pgImpUid":"${pgImpUid}"}`,

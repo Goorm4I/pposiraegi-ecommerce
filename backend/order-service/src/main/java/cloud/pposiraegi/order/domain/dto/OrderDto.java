@@ -58,7 +58,7 @@ public class OrderDto {
 
     public record OrderRequest(
             @NotNull Long checkoutId,
-            Long shippingAddressId,
+            @NotNull Long shippingAddressId,
             @NotBlank String paymentMethod
     ) {
     }
