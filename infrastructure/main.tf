@@ -682,7 +682,9 @@ resource "aws_ecs_task_definition" "msa" {
       { name = "CORS_ALLOWED_ORIGINS", value = "https://${aws_cloudfront_distribution.frontend.domain_name}" },
       { name = "USER_SERVICE_URL", value = "http://user-service.pposiraegi.internal:8080" },
       { name = "PRODUCT_SERVICE_URL", value = "http://product-service.pposiraegi.internal:8080" },
-      { name = "ORDER_SERVICE_URL", value = "http://order-service.pposiraegi.internal:8080" }
+      { name = "ORDER_SERVICE_URL", value = "http://order-service.pposiraegi.internal:8080" },
+      { name = "USER_GRPC_URL", value = "static://user-service.pposiraegi.internal:9090" },
+      { name = "PRODUCT_GRPC_URL", value = "static://product-service.pposiraegi.internal:9090" }
     ]
     secrets = [
       { name = "DB_PASSWORD", valueFrom = aws_ssm_parameter.db_password.arn },
