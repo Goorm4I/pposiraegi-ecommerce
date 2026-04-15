@@ -38,6 +38,7 @@ resource "aws_iam_role_policy" "codebuild_policy" {
           "s3:GetObject",
           "s3:GetObjectVersion",
           "s3:PutObject",
+          "s3:DeleteObject",
           "s3:GetBucketLocation",
           "s3:ListBucket"
         ]

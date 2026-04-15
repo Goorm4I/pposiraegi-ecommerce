@@ -1,12 +1,24 @@
 spring:
   datasource:
-    url: ${PROD_DB_URL}
-    username: ${PROD_DB_USERNAME}
-    password: ${PROD_DB_PASSWORD}
+    url: jdbc:postgresql://${DB_HOST}:5432/ecommerce
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: false
     properties:
       hibernate:
         format_sql: false
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: 6379
+      database: 1
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 64
+          max-idle: 8
+          min-idle: 2
+          max-wait: 1000ms
