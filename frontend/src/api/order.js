@@ -45,9 +45,9 @@ export const submitOrder = async (checkoutId, shippingAddressId, paymentMethod, 
   const res = await axios.post(
     `${API_BASE_URL}/api/v1/orders/submit`,
     `{"checkoutId":${checkoutId},"shippingAddressId":${addressPart},"paymentMethod":"${paymentMethod}","pgImpUid":"${pgImpUid}"}`,
-    { headers: { ...getAuthHeader(), 'Content-Type': 'application/json' } }
+    { headers: { ...getAuthHeader(), 'Content-Type': 'application/json', 'Idempotency-Key': String(checkoutId) } }
   );
-  return res.data.data; // { checkoutId }
+  return res.data.data; // { orderNumber, orderName, amount, pgConfig }
 };
 
 // ── 레거시 (mock 전용) ────────────────────────────────────────────
