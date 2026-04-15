@@ -11,6 +11,7 @@ import cloud.pposiraegi.order.domain.enums.IdempotencyStatus;
 import cloud.pposiraegi.order.domain.enums.OrderItemStatus;
 import cloud.pposiraegi.order.domain.enums.OrderStatus;
 import cloud.pposiraegi.order.domain.generator.OrderNumberGenerator;
+import cloud.pposiraegi.order.domain.grpc.ProductGrpcClient;
 import cloud.pposiraegi.order.domain.repository.IdempotencyRecordRepository;
 import cloud.pposiraegi.order.domain.repository.OrderItemRepository;
 import cloud.pposiraegi.order.domain.repository.OrderRepository;
@@ -24,7 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Component
@@ -35,9 +38,8 @@ public class OrderTransactionProcessor {
     private final TsidFactory tsidFactory;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
-    //    private final ProductStockService productStockService;
+    private final ProductGrpcClient productGrpcClient;
     private final ObjectMapper objectMapper;
-    //    private final ProductQueryService productQueryService;
     private final RedisPurchaseLimitRepository redisPurchaseLimitRepository;
     private final OrderNumberGenerator orderNumberGenerator;
 
@@ -99,6 +101,13 @@ public class OrderTransactionProcessor {
         }
 
         orderItemRepository.saveAll(orderItems);
+
+        // 재고 차감 (gRPC → product-service Redis)
+        Map<Long, Integer> stockDecreaseMap = new HashMap<>();
+        for (OrderItem item : orderItems) {
+            stockDecreaseMap.merge(item.getSkuId(), item.getQuantity(), Integer::sum);
+        }
+        productGrpcClient.decreaseStocks(stockDecreaseMap);
 
         int totalQuantity = session.products().size();
         if (totalQuantity > 1) {

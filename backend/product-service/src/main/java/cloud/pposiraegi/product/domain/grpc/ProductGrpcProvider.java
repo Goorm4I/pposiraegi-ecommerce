@@ -3,17 +3,21 @@ package cloud.pposiraegi.product.domain.grpc;
 import cloud.pposiraegi.grpc.product.*;
 import cloud.pposiraegi.product.domain.dto.ProductInfoDto;
 import cloud.pposiraegi.product.domain.service.ProductQueryService;
+import cloud.pposiraegi.product.domain.service.ProductStockService;
 import io.grpc.stub.StreamObserver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.grpc.server.service.GrpcService;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @GrpcService
 @RequiredArgsConstructor
 public class ProductGrpcProvider extends ProductGrpcServiceGrpc.ProductGrpcServiceImplBase {
 
     private final ProductQueryService productQueryService;
+    private final ProductStockService productStockService;
 
     @Override
     public void getSkuInfos(SkuInfoRequest request, StreamObserver<SkuInfoResponse> responseObserver) {
@@ -49,6 +53,15 @@ public class ProductGrpcProvider extends ProductGrpcServiceGrpc.ProductGrpcServi
                 .build();
 
         responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void decreaseStocks(DecreaseStockRequest request, StreamObserver<DecreaseStockResponse> responseObserver) {
+        Map<Long, Integer> stockMap = request.getItemsList().stream()
+                .collect(Collectors.toMap(StockItem::getSkuId, StockItem::getQuantity));
+        productStockService.decreaseStocks(stockMap);
+        responseObserver.onNext(DecreaseStockResponse.newBuilder().setSuccess(true).build());
         responseObserver.onCompleted();
     }
 }

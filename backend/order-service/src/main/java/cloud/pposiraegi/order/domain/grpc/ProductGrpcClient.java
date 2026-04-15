@@ -5,6 +5,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -28,5 +30,20 @@ public class ProductGrpcClient {
 
         PurchaseLimitResponse response = productStub.getSkuPurchaseLimit(request);
         return response.getPurchaseLimit();
+    }
+
+    public void decreaseStocks(Map<Long, Integer> stockRequests) {
+        List<StockItem> items = stockRequests.entrySet().stream()
+                .map(e -> StockItem.newBuilder()
+                        .setSkuId(e.getKey())
+                        .setQuantity(e.getValue())
+                        .build())
+                .collect(Collectors.toList());
+
+        DecreaseStockRequest request = DecreaseStockRequest.newBuilder()
+                .addAllItems(items)
+                .build();
+
+        productStub.decreaseStocks(request);
     }
 }

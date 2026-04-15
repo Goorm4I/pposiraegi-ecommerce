@@ -6,6 +6,7 @@ option java_package = "cloud.pposiraegi.grpc.product";
 service ProductGrpcService {
   rpc GetSkuInfos (SkuInfoRequest) returns (SkuInfoResponse);
   rpc GetSkuPurchaseLimit (PurchaseLimitRequest) returns (PurchaseLimitResponse);
+  rpc DecreaseStocks (DecreaseStockRequest) returns (DecreaseStockResponse);
 }
 
 message SkuInfoRequest {
@@ -33,4 +34,17 @@ message PurchaseLimitRequest {
 
 message PurchaseLimitResponse {
   int32 purchaseLimit = 1;
+}
+
+message StockItem {
+  int64 skuId = 1;
+  int32 quantity = 2;
+}
+
+message DecreaseStockRequest {
+  repeated StockItem items = 1;
+}
+
+message DecreaseStockResponse {
+  bool success = 1;
 }
