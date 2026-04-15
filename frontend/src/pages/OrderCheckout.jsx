@@ -157,9 +157,10 @@ const OrderCheckout = () => {
 
     try {
       const result = await submitOrder(resolvedCheckoutId, address?.id ?? null, paymentMethod, pgResponse?.imp_uid);
-      const orderId = result.checkoutId ?? resolvedCheckoutId;
+      const orderId = result?.orderNumber ?? resolvedCheckoutId;
       const orderForResult = {
         ...result,
+        checkoutId: resolvedCheckoutId,
         productName: deal.productName,
         quantity: 1,
         totalPrice: deal.discountPrice,
