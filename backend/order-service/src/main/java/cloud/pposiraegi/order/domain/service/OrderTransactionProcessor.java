@@ -109,6 +109,12 @@ public class OrderTransactionProcessor {
         }
         productGrpcClient.decreaseStocks(stockDecreaseMap);
 
+        // 목 결제: 실제 PG 콜백 없이 바로 PAID 처리
+        order.updateStatus(OrderStatus.PAID);
+        for (OrderItem item : orderItems) {
+            item.updateStatus(OrderItemStatus.PAID);
+        }
+
         int totalQuantity = session.products().size();
         if (totalQuantity > 1) {
             orderName += (" 외 " + (totalQuantity - 1) + " 건");

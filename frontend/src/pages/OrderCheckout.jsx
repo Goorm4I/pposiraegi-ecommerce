@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getTimeDeal } from '../api/timedeal';
-import { createOrderSheet, submitOrder, confirmMockPayment } from '../api/order';
+import { createOrderSheet, submitOrder } from '../api/order';
 import { getCurrentUser, getAddress, fetchAddresses } from '../api/auth';
 import PGSimulator from '../components/PGSimulator';
 
@@ -157,10 +157,6 @@ const OrderCheckout = () => {
 
     try {
       const result = await submitOrder(resolvedCheckoutId, address?.id ?? null, paymentMethod, pgResponse?.imp_uid);
-      // 목 결제: PG 리다이렉트가 없으므로 직접 success 콜백 호출 → PENDING_PAYMENT → PAID
-      if (result?.orderNumber) {
-        await confirmMockPayment(result.orderNumber, result.amount).catch(() => {});
-      }
       const orderId = result?.orderNumber ?? resolvedCheckoutId;
       const orderForResult = {
         ...result,
