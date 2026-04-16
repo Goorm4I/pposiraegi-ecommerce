@@ -12,7 +12,9 @@ import cloud.pposiraegi.order.domain.enums.IdempotencyStatus;
 import cloud.pposiraegi.order.domain.grpc.ProductGrpcClient;
 import cloud.pposiraegi.order.domain.grpc.UserGrpcClient;
 import cloud.pposiraegi.order.domain.infrastructure.payment.PaymentClient;
+import cloud.pposiraegi.order.domain.entity.OrderItem;
 import cloud.pposiraegi.order.domain.repository.IdempotencyRecordRepository;
+import cloud.pposiraegi.order.domain.repository.OrderItemRepository;
 import cloud.pposiraegi.order.domain.repository.OrderRepository;
 import cloud.pposiraegi.order.domain.repository.RedisPurchaseLimitRepository;
 import com.github.f4b6a3.tsid.TsidFactory;
@@ -36,6 +38,7 @@ import java.util.stream.Collectors;
 public class OrderService {
 
     private final TsidFactory tsidFactory;
+    private final OrderItemRepository orderItemRepository;
     private final OrderTransactionProcessor orderTransactionProcessor;
     private final ObjectMapper objectMapper;
     private final IdempotencyRecordRepository idempotencyRecordRepository;
@@ -222,6 +225,43 @@ public class OrderService {
         orderTransactionProcessor.cancelPendingOrder(order.getId(), userId);
     }
 
+
+    @Transactional(readOnly = true)
+    public List<OrderDto.MyOrderResponse> getMyOrders(Long userId) {
+        List<Order> orders = orderRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        if (orders.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> orderIds = orders.stream().map(Order::getId).toList();
+        Map<Long, List<OrderItem>> itemsByOrderId = orderItemRepository.findByOrderIdIn(orderIds)
+                .stream()
+                .collect(Collectors.groupingBy(OrderItem::getOrderId));
+
+        return orders.stream().map(order -> {
+            List<OrderDto.MyOrderItemResponse> itemResponses = itemsByOrderId
+                    .getOrDefault(order.getId(), List.of())
+                    .stream()
+                    .map(item -> new OrderDto.MyOrderItemResponse(
+                            item.getProductName(),
+                            item.getSkuName(),
+                            item.getQuantity(),
+                            item.getUnitPrice(),
+                            item.getDiscountAmount(),
+                            item.getStatus() != null ? item.getStatus().name() : null
+                    ))
+                    .toList();
+
+            return new OrderDto.MyOrderResponse(
+                    order.getId().toString(),
+                    order.getOrderNumber(),
+                    order.getStatus().name(),
+                    order.getTotalAmount(),
+                    order.getCreatedAt(),
+                    itemResponses
+            );
+        }).toList();
+    }
 
     private OrderDto.ShippingAddressResponse getUserShippingAddress(Long userId) {
         var lastUsedAddress = userGrpcClient.getLastUsedAddress(userId);

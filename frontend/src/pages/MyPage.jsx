@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { getCurrentUser, getAddress, saveAddress, fetchAddresses, logout } from '../api/auth';
+import { getMyOrders } from '../api/order';
 
 /* ── 결제 비밀번호는 localStorage에 유저별 저장 ── */
 const getPayPw = (userId) => localStorage.getItem(`paypw_${userId}`) || null;
@@ -98,6 +99,16 @@ const MyPage = () => {
             onToggle={() => setActiveSection(s => s === 'paypw' ? null : 'paypw')}
           >
             <PayPasswordSection user={user} />
+          </MenuItem>
+
+          {/* 5. 주문처리현황 */}
+          <MenuItem
+            icon="📋"
+            label="주문처리현황"
+            isOpen={activeSection === 'orders'}
+            onToggle={() => setActiveSection(s => s === 'orders' ? null : 'orders')}
+          >
+            <OrderHistorySection />
           </MenuItem>
         </div>
 
@@ -350,6 +361,119 @@ const PayPasswordSection = ({ user }) => {
           </button>
         </>
       )}
+    </div>
+  );
+};
+
+/* ── 5. 주문처리현황 ── */
+const ORDER_STATUS_LABEL = {
+  PENDING_PAYMENT: { text: '결제 대기중', color: 'text-yellow-600 bg-yellow-50 border-yellow-200' },
+  PAID:            { text: '결제 완료',   color: 'text-blue-600 bg-blue-50 border-blue-200' },
+  CANCELED:        { text: '취소됨',      color: 'text-gray-500 bg-gray-50 border-gray-200' },
+  PARTIAL_REFUNDED:{ text: '부분 환불',   color: 'text-orange-600 bg-orange-50 border-orange-200' },
+  REFUNDED:        { text: '환불 완료',   color: 'text-orange-600 bg-orange-50 border-orange-200' },
+  PAYMENT_FAILED:  { text: '결제 실패',   color: 'text-red-600 bg-red-50 border-red-200' },
+};
+
+const ITEM_STATUS_LABEL = {
+  PROCESSING: '처리중',
+  SHIPPED:    '배송중',
+  DELIVERED:  '배송완료',
+  CANCELED:   '취소됨',
+};
+
+const OrderHistorySection = () => {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [expandedOrderId, setExpandedOrderId] = useState(null);
+
+  useEffect(() => {
+    getMyOrders()
+      .then(data => setOrders(data))
+      .catch(() => setError('주문 내역을 불러오는데 실패했습니다.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="pt-4 text-center text-sm text-brand-500 py-6">불러오는 중...</div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="pt-4 text-center text-sm text-red-500 py-4">{error}</div>
+    );
+  }
+
+  if (orders.length === 0) {
+    return (
+      <div className="pt-4 text-center text-sm text-brand-400 py-6">
+        아직 주문 내역이 없어요.
+      </div>
+    );
+  }
+
+  return (
+    <div className="pt-4 space-y-3">
+      {orders.map(order => {
+        const statusInfo = ORDER_STATUS_LABEL[order.status] || { text: order.status, color: 'text-brand-500 bg-brand-50 border-brand-200' };
+        const isExpanded = expandedOrderId === order.orderId;
+        const date = order.createdAt ? new Date(order.createdAt).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '';
+
+        return (
+          <div key={order.orderId} className="bg-white rounded-xl border border-brand-100 overflow-hidden">
+            <button
+              onClick={() => setExpandedOrderId(id => id === order.orderId ? null : order.orderId)}
+              className="w-full px-4 py-3 flex items-center gap-2 text-left hover:bg-brand-50 transition"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-brand-400">{date} · {order.orderNumber}</p>
+                <p className="text-sm font-semibold text-brand-800 mt-0.5">
+                  {order.items?.[0]?.productName ?? '주문 상품'}
+                  {order.items?.length > 1 && ` 외 ${order.items.length - 1}건`}
+                </p>
+                <p className="text-sm text-brand-600 mt-0.5">
+                  {Number(order.totalAmount).toLocaleString('ko-KR')}원
+                </p>
+              </div>
+              <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${statusInfo.color}`}>
+                  {statusInfo.text}
+                </span>
+                <svg
+                  className={`w-4 h-4 text-brand-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </button>
+
+            {isExpanded && (
+              <div className="border-t border-brand-100 px-4 py-3 space-y-2 bg-brand-50/40">
+                {order.items?.map((item, idx) => (
+                  <div key={idx} className="flex items-start justify-between gap-2 text-sm">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-brand-800 truncate">{item.productName}</p>
+                      {item.skuName && <p className="text-xs text-brand-500">{item.skuName}</p>}
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-brand-700">{item.quantity}개 · {Number(item.unitPrice).toLocaleString('ko-KR')}원</p>
+                      {item.status && (
+                        <p className="text-xs text-brand-400 mt-0.5">
+                          {ITEM_STATUS_LABEL[item.status] ?? item.status}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };

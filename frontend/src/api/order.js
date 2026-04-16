@@ -84,4 +84,19 @@ export const getOrder = async (checkoutId) => {
   return res.data?.data ?? null;
 };
 
-export default { createOrderSheet, submitOrder, createOrder, payOrder, getOrder };
+// ── 내 주문 내역 조회 ─────────────────────────────────────────────
+// GET /api/v1/orders/my
+export const getMyOrders = async () => {
+  if (USE_MOCK) {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return [];
+  }
+
+  const res = await axios.get(
+    `${API_BASE_URL}/api/v1/orders/my`,
+    { headers: getAuthHeader() }
+  );
+  return res.data?.data ?? [];
+};
+
+export default { createOrderSheet, submitOrder, createOrder, payOrder, getOrder, getMyOrders };

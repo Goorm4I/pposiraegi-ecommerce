@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class OrderDto {
@@ -75,6 +76,26 @@ public class OrderDto {
     public record PgConfig(
             String successUrl,
             String failUrl
+    ) {
+    }
+
+    public record MyOrderItemResponse(
+            String productName,
+            String skuName,
+            Integer quantity,
+            BigDecimal unitPrice,
+            BigDecimal discountAmount,
+            String status
+    ) {
+    }
+
+    public record MyOrderResponse(
+            String orderId,
+            String orderNumber,
+            String status,
+            BigDecimal totalAmount,
+            LocalDateTime createdAt,
+            List<MyOrderItemResponse> items
     ) {
     }
 }

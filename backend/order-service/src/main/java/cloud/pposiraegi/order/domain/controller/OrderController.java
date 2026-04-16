@@ -9,12 +9,20 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/orders")
 @RequiredArgsConstructor
 public class OrderController {
     private final OrderService orderService;
+
+    @GetMapping("/my")
+    public ApiResponse<List<OrderDto.MyOrderResponse>> getMyOrders(
+            @RequestHeader(AuthConstants.USER_ID_HEADER) String userId
+    ) {
+        return ApiResponse.success(orderService.getMyOrders(Long.parseLong(userId)));
+    }
 
     @PostMapping
     public ApiResponse<OrderDto.OrderSheetResponse> createCheckoutSession(
