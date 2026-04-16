@@ -1,6 +1,10 @@
 package cloud.pposiraegi.order.domain.grpc;
 
+import cloud.pposiraegi.common.exception.BusinessException;
+import cloud.pposiraegi.common.exception.ErrorCode;
 import cloud.pposiraegi.grpc.product.*;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -44,6 +48,13 @@ public class ProductGrpcClient {
                 .addAllItems(items)
                 .build();
 
-        productStub.decreaseStocks(request);
+        try {
+            productStub.decreaseStocks(request);
+        } catch (StatusRuntimeException e) {
+            if (e.getStatus().getCode() == Status.Code.RESOURCE_EXHAUSTED) {
+                throw new BusinessException(ErrorCode.OUT_OF_STOCK);
+            }
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
     }
 }

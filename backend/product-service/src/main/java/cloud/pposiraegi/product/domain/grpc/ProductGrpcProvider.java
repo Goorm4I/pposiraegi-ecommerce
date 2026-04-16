@@ -1,5 +1,6 @@
 package cloud.pposiraegi.product.domain.grpc;
 
+import cloud.pposiraegi.common.exception.BusinessException;
 import cloud.pposiraegi.grpc.product.*;
 import cloud.pposiraegi.product.domain.dto.ProductInfoDto;
 import cloud.pposiraegi.product.domain.entity.ProductSku;
@@ -7,6 +8,7 @@ import cloud.pposiraegi.product.domain.repository.ProductSkuRepository;
 import cloud.pposiraegi.product.domain.service.ProductQueryService;
 import cloud.pposiraegi.product.domain.service.ProductStockService;
 import cloud.pposiraegi.product.domain.service.TimeDealService;
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.grpc.server.service.GrpcService;
@@ -66,17 +68,23 @@ public class ProductGrpcProvider extends ProductGrpcServiceGrpc.ProductGrpcServi
         Map<Long, Integer> stockMap = request.getItemsList().stream()
                 .collect(Collectors.toMap(StockItem::getSkuId, StockItem::getQuantity));
 
-        // Redis SKU 재고 차감
-        productStockService.decreaseStocks(stockMap);
+        try {
+            // Redis SKU 재고 차감
+            productStockService.decreaseStocks(stockMap);
 
-        // TimeDeal DB remainQuantity 차감 (skuId → productId → active TimeDeal)
-        List<Long> skuIds = List.copyOf(stockMap.keySet());
-        List<ProductSku> skus = productSkuRepository.findAllById(skuIds);
-        for (ProductSku sku : skus) {
-            timeDealService.decreaseStockByProductId(sku.getProductId(), stockMap.get(sku.getId()));
+            // TimeDeal DB remainQuantity 차감 (skuId → productId → active TimeDeal)
+            List<Long> skuIds = List.copyOf(stockMap.keySet());
+            List<ProductSku> skus = productSkuRepository.findAllById(skuIds);
+            for (ProductSku sku : skus) {
+                timeDealService.decreaseStockByProductId(sku.getProductId(), stockMap.get(sku.getId()));
+            }
+
+            responseObserver.onNext(DecreaseStockResponse.newBuilder().setSuccess(true).build());
+            responseObserver.onCompleted();
+        } catch (BusinessException e) {
+            responseObserver.onError(Status.RESOURCE_EXHAUSTED
+                    .withDescription(e.getErrorCode().getCode())
+                    .asRuntimeException());
         }
-
-        responseObserver.onNext(DecreaseStockResponse.newBuilder().setSuccess(true).build());
-        responseObserver.onCompleted();
     }
 }
