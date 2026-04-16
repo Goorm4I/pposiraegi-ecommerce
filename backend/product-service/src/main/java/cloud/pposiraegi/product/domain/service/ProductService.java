@@ -202,8 +202,11 @@ public class ProductService {
                     if (sku.getCombinationKey() != null && !sku.getCombinationKey().isEmpty()) {
                         String[] valueIds = sku.getCombinationKey().split(":");
                         for (String idStr : valueIds) {
-                            Long valueId = Long.parseLong(idStr);
-                            optionValues.add(valueId);
+                            try {
+                                optionValues.add(Long.parseLong(idStr.trim()));
+                            } catch (NumberFormatException e) {
+                                // combination_key가 옵션 ID가 아닌 텍스트 라벨인 경우 무시 (단일 SKU 상품)
+                            }
                         }
                     }
                     return ProductDto.SkuResponse.from(sku, optionValues);
