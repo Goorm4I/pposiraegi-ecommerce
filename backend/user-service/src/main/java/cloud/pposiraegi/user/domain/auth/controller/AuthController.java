@@ -2,6 +2,8 @@ package cloud.pposiraegi.user.domain.auth.controller;
 
 import cloud.pposiraegi.common.constants.AuthConstants;
 import cloud.pposiraegi.common.dto.ApiResponse;
+import cloud.pposiraegi.common.exception.BusinessException;
+import cloud.pposiraegi.common.exception.ErrorCode;
 import cloud.pposiraegi.user.domain.auth.dto.AuthDto;
 import cloud.pposiraegi.user.domain.auth.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,6 +23,18 @@ public class AuthController {
         String deviceInfo = request.getHeader("Device-Info");
 
         AuthDto.LoginResponse response = authService.login(loginRequest, ipAddress, deviceInfo);
+
+        return ApiResponse.success(response);
+    }
+
+    @PostMapping("/reissue")
+    public ApiResponse<AuthDto.RefreshResponse> reissue(
+            @CookieValue(value = "refresh_token", required = false) String refreshToken) {
+        if (refreshToken == null) {
+            throw new BusinessException(ErrorCode.INVALID_TOKEN);
+        }
+
+        AuthDto.RefreshResponse response = authService.reissue(refreshToken);
 
         return ApiResponse.success(response);
     }

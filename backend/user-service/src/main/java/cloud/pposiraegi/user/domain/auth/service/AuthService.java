@@ -3,7 +3,7 @@ package cloud.pposiraegi.user.domain.auth.service;
 import cloud.pposiraegi.common.exception.BusinessException;
 import cloud.pposiraegi.common.exception.ErrorCode;
 import cloud.pposiraegi.user.domain.auth.dto.AuthDto;
-import cloud.pposiraegi.user.domain.auth.entity.UserRefreshTokenEntity;
+import cloud.pposiraegi.user.domain.auth.entity.UserRefreshToken;
 import cloud.pposiraegi.user.domain.auth.repository.UserRefreshTokenRepository;
 import cloud.pposiraegi.user.domain.user.entity.User;
 import cloud.pposiraegi.user.domain.user.enums.UserStatus;
@@ -71,7 +71,7 @@ public class AuthService {
                         },
                         // 5-B. 기존 접속이 없다면 완전히 새로 생성합니다.
                         () -> {
-                            UserRefreshTokenEntity newToken = UserRefreshTokenEntity.builder()
+                            UserRefreshToken newToken = UserRefreshToken.builder()
                                     .id(tsidFactory.create().toLong()) // 신규 생성 시에만 TSID 발급
                                     .userId(user.getId())
                                     .tokenValue(refreshToken)
@@ -91,15 +91,34 @@ public class AuthService {
 
     @Transactional
     public void logout(Long userId, AuthDto.LogoutRequest logoutRequest) {
-        UserRefreshTokenEntity rtEntity = userRefreshTokenRepository.findByTokenValue(logoutRequest.refreshToken())
+        UserRefreshToken rtEntity = userRefreshTokenRepository.findByTokenValue(logoutRequest.refreshToken())
                 .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
 
         if (!rtEntity.getUserId().equals(userId)) {
-            log.warn("Security Alert: User {} attempted to delete session of User {}",
-                    userId, rtEntity.getUserId());
             throw new BusinessException(ErrorCode.TOKEN_USER_MISMATCH);
         }
 
         userRefreshTokenRepository.delete(rtEntity);
+    }
+
+    @Transactional
+    public AuthDto.RefreshResponse reissue(String refreshTokenValue) {
+        if (!tokenProvider.validateToken(refreshTokenValue)) {
+            throw new BusinessException(ErrorCode.INVALID_TOKEN);
+        }
+
+        UserRefreshToken rtEntity = userRefreshTokenRepository.findByTokenValue(refreshTokenValue)
+                .orElseThrow(() -> new BusinessException(ErrorCode.EXPIRED_REFRESH_TOKEN));
+
+        if (rtEntity.getExpiresAt().isBefore(LocalDateTime.now())) {
+            userRefreshTokenRepository.delete(rtEntity);
+            throw new BusinessException(ErrorCode.EXPIRED_REFRESH_TOKEN);
+        }
+
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS);
+        LocalDateTime accessExpiry = now.plus(accessTokenValidityTime, ChronoUnit.MILLIS);
+        String accessToken = tokenProvider.createAccessToken(rtEntity.getUserId(), now, accessExpiry);
+
+        return new AuthDto.RefreshResponse(accessToken);
     }
 }

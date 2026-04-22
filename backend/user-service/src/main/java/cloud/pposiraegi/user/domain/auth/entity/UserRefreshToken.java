@@ -25,7 +25,7 @@ import java.time.LocalDateTime;
 })
 */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class UserRefreshTokenEntity extends BaseCreatedEntity {
+public class UserRefreshToken extends BaseCreatedEntity {
     @Id
     private Long id;
 
@@ -45,7 +45,7 @@ public class UserRefreshTokenEntity extends BaseCreatedEntity {
     private LocalDateTime expiresAt;
 
     @Builder
-    UserRefreshTokenEntity(Long id, Long userId, String tokenValue, String ipAddress, String deviceInfo, LocalDateTime createdAt, LocalDateTime expiresAt) {
+    UserRefreshToken(Long id, Long userId, String tokenValue, String ipAddress, String deviceInfo, LocalDateTime createdAt, LocalDateTime expiresAt) {
         this.id = id;
         this.userId = userId;
         this.tokenValue = tokenValue;

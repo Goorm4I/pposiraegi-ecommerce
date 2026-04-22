@@ -26,8 +26,8 @@ public class AuthDto {
     ) {
     }
 
-    public record RefreshRequest(
-            String refreshToken
+    public record RefreshResponse(
+            String accessToken
     ) {
     }
 

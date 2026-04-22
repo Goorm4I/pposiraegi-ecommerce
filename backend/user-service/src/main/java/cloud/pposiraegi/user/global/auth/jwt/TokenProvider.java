@@ -54,8 +54,12 @@ public class TokenProvider {
     }
 
     public boolean validateToken(String token) {
-        parseClaims(token);
-        return true;
+        try {
+            parseClaims(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public Authentication getAuthentication(String token) {
