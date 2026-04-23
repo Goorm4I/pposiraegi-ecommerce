@@ -1,0 +1,28 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - echo Installing pnpm...
+      - npm install -g pnpm@latest
+  pre_build:
+    commands:
+      - echo Installing dependencies...
+      - pnpm install --no-frozen-lockfile
+      - echo "REACT_APP_USE_MOCK=false" >> frontend/.env
+      - echo "REACT_APP_API_URL=" >> frontend/.env
+      - echo "REACT_APP_WS_URL=wss://pposiraegi.cloud/ws/events" >> frontend/.env
+      - echo "REACT_APP_ADMIN_EMAILS=admin@test.com" >> frontend/.env
+  build:
+    commands:
+      - echo Building Frontend...
+      - pnpm turbo run build --filter=timedeal-front
+  post_build:
+    commands:
+      - echo Deploying to S3...
+      - aws s3 sync frontend/build s3://$S3_BUCKET --delete
+      - echo Invalidating CloudFront cache...
+      - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
+      - echo Frontend Deployment completed!
