@@ -4,9 +4,9 @@ spring:
   profiles:
     active: local
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ecommerce}
-    username: ${SPRING_DATASOURCE_USERNAME:user}
-    password: ${SPRING_DATASOURCE_PASSWORD:password}
+    url: jdbc:postgresql://localhost:15432/ecommerce_product
+    username: postgres
+    password: "0000"
   jpa:
     hibernate:
       ddl-auto: update
