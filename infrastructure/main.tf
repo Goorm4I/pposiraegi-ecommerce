@@ -29,274 +29,44 @@ terraform {
 # Data
 ###############################################################
 data "aws_availability_zones" "available" {}
+data "aws_caller_identity" "current" {}
 
 ###############################################################
-# VPC
-###############################################################
-resource "aws_vpc" "main" {
-  cidr_block           = var.vpc_cidr
-  enable_dns_support   = true
-  enable_dns_hostnames = true
-
-  tags = { Name = "${var.project_name}-vpc" }
-}
-
-###############################################################
-# Internet Gateway
-###############################################################
-resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.main.id
-
-  tags = { Name = "${var.project_name}-igw" }
-}
-
-###############################################################
-# Public Subnets (ALB은 2개 AZ 필요)
-###############################################################
-resource "aws_subnet" "public_a" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.public_subnet_a_cidr
-  availability_zone       = data.aws_availability_zones.available.names[0]
-  map_public_ip_on_launch = true
-
-  tags = { Name = "${var.project_name}-public-a" }
-}
-
-resource "aws_subnet" "public_b" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.public_subnet_b_cidr
-  availability_zone       = data.aws_availability_zones.available.names[1]
-  map_public_ip_on_launch = true
-
-  tags = { Name = "${var.project_name}-public-b" }
-}
-
-###############################################################
-# Private Subnets (RDS / ElastiCache용)
-###############################################################
-resource "aws_subnet" "private_a" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = var.private_subnet_a_cidr
-  availability_zone = data.aws_availability_zones.available.names[0]
-
-  tags = { Name = "${var.project_name}-private-a" }
-}
-
-resource "aws_subnet" "private_b" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = var.private_subnet_b_cidr
-  availability_zone = data.aws_availability_zones.available.names[1]
-
-  tags = { Name = "${var.project_name}-private-b" }
-}
-
-###############################################################
-# Public Route Table
-###############################################################
-resource "aws_route_table" "public_rt" {
-  vpc_id = aws_vpc.main.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
-  }
-
-  tags = { Name = "${var.project_name}-public-rt" }
-}
-
-resource "aws_route_table_association" "public_a" {
-  subnet_id      = aws_subnet.public_a.id
-  route_table_id = aws_route_table.public_rt.id
-}
-
-resource "aws_route_table_association" "public_b" {
-  subnet_id      = aws_subnet.public_b.id
-  route_table_id = aws_route_table.public_rt.id
-}
-
-###############################################################
-# Private Route Table
-###############################################################
-resource "aws_eip" "nat" {
-  domain = "vpc"
-  tags   = { Name = "${var.project_name}-nat-eip" }
-}
-
-resource "aws_nat_gateway" "nat" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public_a.id
-  tags          = { Name = "${var.project_name}-nat" }
-}
-
-resource "aws_route_table" "private_rt" {
-  vpc_id = aws_vpc.main.id
-
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.nat.id
-  }
-
-  tags = { Name = "${var.project_name}-private-rt" }
-}
-
-resource "aws_route_table_association" "private_a" {
-  subnet_id      = aws_subnet.private_a.id
-  route_table_id = aws_route_table.private_rt.id
-}
-
-resource "aws_route_table_association" "private_b" {
-  subnet_id      = aws_subnet.private_b.id
-  route_table_id = aws_route_table.private_rt.id
-}
-
-###############################################################
-# Security Groups
+# Modules
 ###############################################################
 
-# Redis (ElastiCache): backend_sg → 6379
-resource "aws_security_group" "redis_sg" {
-  vpc_id      = aws_vpc.main.id
-  name        = "${var.project_name}-redis-sg"
-  description = "ElastiCache Redis security group"
+# 1. 네트워킹 (VPC, Subnet, Route Table, NAT)
+module "networking" {
+  source = "./modules/networking"
 
-  ingress {
-    from_port       = 6379
-    to_port         = 6379
-    protocol        = "tcp"
-    security_groups = [aws_security_group.api_gateway_sg.id, aws_security_group.internal_msa_sg.id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = { Name = "${var.project_name}-redis-sg" }
+  project_name          = var.project_name
+  vpc_cidr              = var.vpc_cidr
+  public_subnet_a_cidr  = var.public_subnet_a_cidr
+  public_subnet_b_cidr  = var.public_subnet_b_cidr
+  private_subnet_a_cidr = var.private_subnet_a_cidr
+  private_subnet_b_cidr = var.private_subnet_b_cidr
+  azs                   = data.aws_availability_zones.available.names
 }
 
-# ALB: 인터넷 → 80
-resource "aws_security_group" "alb_sg" {
-  vpc_id      = aws_vpc.main.id
-  name        = "${var.project_name}-alb-sg"
-  description = "ALB security group"
+# 2. 보안 그룹 (Security Groups)
+module "security" {
+  source = "./modules/security"
 
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = { Name = "${var.project_name}-alb-sg" }
+  project_name = var.project_name
+  vpc_id       = module.networking.vpc_id
 }
 
-# Backend EC2: ALB → 8080, SSH → my_ip
-resource "aws_security_group" "api_gateway_sg" {
-  vpc_id      = aws_vpc.main.id
-  name        = "${var.project_name}-api-gateway-sg"
-  description = "API Gateway ECS security group"
+# 3. 스토리지 (RDS, ElastiCache, S3, SSM)
+module "storage" {
+  source = "./modules/storage"
 
-  ingress {
-    from_port       = 8080
-    to_port         = 8080
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = { Name = "${var.project_name}-api-gateway-sg" }
-}
-
-resource "aws_security_group" "internal_msa_sg" {
-  vpc_id      = aws_vpc.main.id
-  name        = "${var.project_name}-internal-msa-sg"
-  description = "Internal MSA ECS security group"
-
-  ingress {
-    from_port       = 8080
-    to_port         = 8080
-    protocol        = "tcp"
-    security_groups = [aws_security_group.api_gateway_sg.id]
-  }
-
-  ingress {
-    from_port = 8080
-    to_port   = 8080
-    protocol  = "tcp"
-    self      = true
-  }
-
-  # gRPC 내부 통신 (order-service → user/product-service)
-  ingress {
-    from_port = 9090
-    to_port   = 9090
-    protocol  = "tcp"
-    self      = true
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = { Name = "${var.project_name}-internal-msa-sg" }
-}
-
-###############################################################
-# S3 (프론트엔드 정적 호스팅) - CloudFront보다 먼저 선언
-###############################################################
-resource "random_id" "suffix" {
-  byte_length = 4
-}
-
-resource "aws_s3_bucket" "frontend" {
-  bucket        = "${var.project_name}-frontend-${random_id.suffix.hex}"
-  force_destroy = true
-
-  tags = { Name = "${var.project_name}-frontend" }
-}
-
-resource "aws_s3_bucket_public_access_block" "frontend" {
-  bucket = aws_s3_bucket.frontend.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-resource "aws_s3_bucket_website_configuration" "frontend" {
-  bucket = aws_s3_bucket.frontend.id
-
-  index_document { suffix = "index.html" }
-  error_document { key = "index.html" }
-}
-
-###############################################################
-# CloudFront OAC
-###############################################################
-resource "aws_cloudfront_origin_access_control" "frontend_oac" {
-  name                              = "${var.project_name}-oac"
-  origin_access_control_origin_type = "s3"
-  signing_behavior                  = "always"
-  signing_protocol                  = "sigv4"
+  project_name       = var.project_name
+  private_subnet_ids = [module.networking.private_subnet_a_id, module.networking.private_subnet_b_id]
+  rds_sg_id          = module.security.rds_sg_id
+  redis_sg_id        = module.security.redis_sg_id
+  db_username        = var.db_username
+  db_password        = var.db_password
+  jwt_secret         = var.jwt_secret
 }
 
 ###############################################################
@@ -305,8 +75,8 @@ resource "aws_cloudfront_origin_access_control" "frontend_oac" {
 resource "aws_lb" "alb" {
   name               = "${var.project_name}-alb"
   load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = [aws_subnet.public_a.id, aws_subnet.public_b.id]
+  security_groups    = [module.security.alb_sg_id]
+  subnets            = [module.networking.public_subnet_a_id, module.networking.public_subnet_b_id]
 
   tags = { Name = "${var.project_name}-alb" }
 }
@@ -315,7 +85,7 @@ resource "aws_lb_target_group" "backend_tg" {
   name        = "${var.project_name}-tg"
   port        = 8080
   protocol    = "HTTP"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = module.networking.vpc_id
   target_type = "ip"
 
   health_check {
@@ -342,6 +112,16 @@ resource "aws_lb_listener" "http" {
 }
 
 ###############################################################
+# CloudFront OAC
+###############################################################
+resource "aws_cloudfront_origin_access_control" "frontend_oac" {
+  name                              = "${var.project_name}-oac"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
+###############################################################
 # CloudFront Distribution
 ###############################################################
 resource "aws_cloudfront_distribution" "frontend" {
@@ -350,14 +130,12 @@ resource "aws_cloudfront_distribution" "frontend" {
   price_class         = "PriceClass_All"
   aliases             = [var.domain_name, "www.${var.domain_name}"]
 
-  # S3 Origin (프론트엔드)
   origin {
-    domain_name              = aws_s3_bucket.frontend.bucket_regional_domain_name
+    domain_name              = module.storage.frontend_bucket_domain
     origin_id                = "s3-frontend"
     origin_access_control_id = aws_cloudfront_origin_access_control.frontend_oac.id
   }
 
-  # ALB Origin (백엔드 API)
   origin {
     domain_name = aws_lb.alb.dns_name
     origin_id   = "alb-backend"
@@ -370,7 +148,6 @@ resource "aws_cloudfront_distribution" "frontend" {
     }
   }
 
-  # /api/* → ALB (백엔드)
   ordered_cache_behavior {
     path_pattern           = "/api/*"
     target_origin_id       = "alb-backend"
@@ -389,7 +166,6 @@ resource "aws_cloudfront_distribution" "frontend" {
     max_ttl     = 0
   }
 
-  # /* → S3 (프론트엔드)
   default_cache_behavior {
     target_origin_id       = "s3-frontend"
     viewer_protocol_policy = "redirect-to-https"
@@ -406,7 +182,6 @@ resource "aws_cloudfront_distribution" "frontend" {
     max_ttl     = 86400
   }
 
-  # SPA 라우팅: 403/404 → index.html
   custom_error_response {
     error_code         = 403
     response_code      = 200
@@ -436,7 +211,7 @@ resource "aws_cloudfront_distribution" "frontend" {
 # S3 Bucket Policy (CloudFront OAC 접근 허용)
 ###############################################################
 resource "aws_s3_bucket_policy" "frontend" {
-  bucket = aws_s3_bucket.frontend.id
+  bucket = module.storage.frontend_bucket_name
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -444,7 +219,7 @@ resource "aws_s3_bucket_policy" "frontend" {
       Effect    = "Allow"
       Principal = { Service = "cloudfront.amazonaws.com" }
       Action    = "s3:GetObject"
-      Resource  = "${aws_s3_bucket.frontend.arn}/*"
+      Resource  = "${module.storage.frontend_bucket_arn}/*"
       Condition = {
         StringEquals = {
           "AWS:SourceArn" = aws_cloudfront_distribution.frontend.arn
@@ -454,96 +229,6 @@ resource "aws_s3_bucket_policy" "frontend" {
   })
 }
 
-###############################################################
-# RDS Security Group
-###############################################################
-resource "aws_security_group" "rds_sg" {
-  vpc_id      = aws_vpc.main.id
-  name        = "${var.project_name}-rds-sg"
-  description = "RDS PostgreSQL security group"
-
-  ingress {
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.api_gateway_sg.id, aws_security_group.internal_msa_sg.id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = { Name = "${var.project_name}-rds-sg" }
-}
-
-###############################################################
-# RDS PostgreSQL
-###############################################################
-resource "aws_db_subnet_group" "rds" {
-  name       = "${var.project_name}-rds-subnet"
-  subnet_ids = [aws_subnet.private_a.id, aws_subnet.private_b.id]
-}
-
-resource "aws_db_instance" "postgres" {
-  identifier              = "${var.project_name}-db"
-  engine                  = "postgres"
-  engine_version          = "15"
-  instance_class          = "db.t3.micro"
-  allocated_storage       = 20
-  storage_type            = "gp2"
-  db_name                 = "ecommerce"
-  username                = var.db_username
-  password                = var.db_password
-  db_subnet_group_name    = aws_db_subnet_group.rds.name
-  vpc_security_group_ids  = [aws_security_group.rds_sg.id]
-  publicly_accessible     = false
-  skip_final_snapshot     = true
-  backup_retention_period = 1
-
-  tags = { Name = "${var.project_name}-db" }
-}
-
-###############################################################
-# ElastiCache (Redis) - EC2 내부 Redis 대체
-###############################################################
-resource "aws_elasticache_subnet_group" "redis" {
-  name       = "${var.project_name}-redis-subnet"
-  subnet_ids = [aws_subnet.private_a.id, aws_subnet.private_b.id]
-}
-
-resource "aws_elasticache_cluster" "redis" {
-  cluster_id           = "${var.project_name}-redis"
-  engine               = "redis"
-  node_type            = "cache.t3.micro"
-  num_cache_nodes      = 1
-  parameter_group_name = "default.redis7"
-  port                 = 6379
-  subnet_group_name    = aws_elasticache_subnet_group.redis.name
-  security_group_ids   = [aws_security_group.redis_sg.id]
-
-  tags = { Name = "${var.project_name}-redis" }
-}
-
-
-
-
-###############################################################
-# SSM Parameter Store (Secrets)
-###############################################################
-resource "aws_ssm_parameter" "jwt_secret" {
-  name  = "/${var.project_name}/jwt_secret"
-  type  = "SecureString"
-  value = var.jwt_secret
-}
-
-resource "aws_ssm_parameter" "db_password" {
-  name  = "/${var.project_name}/db_password"
-  type  = "SecureString"
-  value = var.db_password
-}
 ###############################################################
 # ECR Repositories (MSA)
 ###############################################################
@@ -604,8 +289,8 @@ resource "aws_iam_role_policy" "ecs_task_execution_ssm_policy" {
       Effect = "Allow"
       Action = ["ssm:GetParameters"]
       Resource = [
-        aws_ssm_parameter.jwt_secret.arn,
-        aws_ssm_parameter.db_password.arn
+        module.storage.jwt_secret_arn,
+        module.storage.db_password_arn
       ]
     }]
   })
@@ -629,7 +314,7 @@ resource "aws_iam_role" "ecs_task_role" {
 resource "aws_service_discovery_private_dns_namespace" "internal" {
   name        = "pposiraegi.internal"
   description = "Private DNS namespace for microservices"
-  vpc         = aws_vpc.main.id
+  vpc         = module.networking.vpc_id
 }
 
 resource "aws_service_discovery_service" "msa" {
@@ -676,9 +361,9 @@ resource "aws_ecs_task_definition" "msa" {
     }]
     environment = [
       { name = "SPRING_PROFILES_ACTIVE", value = "prod" },
-      { name = "DB_HOST", value = aws_db_instance.postgres.address },
+      { name = "DB_HOST", value = module.storage.rds_endpoint },
       { name = "DB_USERNAME", value = var.db_username },
-      { name = "REDIS_HOST", value = aws_elasticache_cluster.redis.cache_nodes[0].address },
+      { name = "REDIS_HOST", value = module.storage.redis_endpoint },
       { name = "CORS_ALLOWED_ORIGINS", value = "https://${aws_cloudfront_distribution.frontend.domain_name}" },
       { name = "USER_SERVICE_URL", value = "http://user-service.pposiraegi.internal:8080" },
       { name = "PRODUCT_SERVICE_URL", value = "http://product-service.pposiraegi.internal:8080" },
@@ -687,8 +372,8 @@ resource "aws_ecs_task_definition" "msa" {
       { name = "PRODUCT_GRPC_URL", value = "static://product-service.pposiraegi.internal:9090" }
     ]
     secrets = [
-      { name = "DB_PASSWORD", valueFrom = aws_ssm_parameter.db_password.arn },
-      { name = "JWT_SECRET", valueFrom = aws_ssm_parameter.jwt_secret.arn }
+      { name = "DB_PASSWORD", valueFrom = module.storage.db_password_arn },
+      { name = "JWT_SECRET", valueFrom = module.storage.jwt_secret_arn }
     ]
     logConfiguration = {
       logDriver = "awslogs"
@@ -713,8 +398,8 @@ resource "aws_ecs_service" "msa" {
   desired_count   = 1
 
   network_configuration {
-    subnets          = [aws_subnet.private_a.id, aws_subnet.private_b.id]
-    security_groups  = each.key == "api-gateway" ? [aws_security_group.api_gateway_sg.id] : [aws_security_group.internal_msa_sg.id]
+    subnets          = [module.networking.private_subnet_a_id, module.networking.private_subnet_b_id]
+    security_groups  = each.key == "api-gateway" ? [module.security.api_gateway_sg_id] : [module.security.internal_msa_sg_id]
     assign_public_ip = false
   }
 
@@ -722,7 +407,6 @@ resource "aws_ecs_service" "msa" {
     registry_arn = aws_service_discovery_service.msa[each.key].arn
   }
 
-  # api-gateway만 ALB에 연결
   dynamic "load_balancer" {
     for_each = each.key == "api-gateway" ? [1] : []
     content {
@@ -732,10 +416,9 @@ resource "aws_ecs_service" "msa" {
     }
   }
 
-  depends_on = [
-    aws_lb_listener.http
-  ]
+  depends_on = [aws_lb_listener.http]
 }
+
 ###############################################################
 # ACM (us-east-1 for CloudFront)
 ###############################################################
@@ -760,7 +443,6 @@ data "aws_route53_zone" "main" {
   private_zone = false
 }
 
-# ACM DNS 검증 레코드
 resource "aws_route53_record" "cert_validation" {
   for_each = {
     for dvo in aws_acm_certificate.cert.domain_validation_options : dvo.domain_name => {
@@ -784,7 +466,6 @@ resource "aws_acm_certificate_validation" "cert" {
   validation_record_fqdns = [for r in aws_route53_record.cert_validation : r.fqdn]
 }
 
-# pposiraegi.cloud → CloudFront
 resource "aws_route53_record" "root" {
   zone_id = data.aws_route53_zone.main.zone_id
   name    = var.domain_name
@@ -797,7 +478,6 @@ resource "aws_route53_record" "root" {
   }
 }
 
-# www.pposiraegi.cloud → CloudFront
 resource "aws_route53_record" "www" {
   zone_id = data.aws_route53_zone.main.zone_id
   name    = "www.${var.domain_name}"
