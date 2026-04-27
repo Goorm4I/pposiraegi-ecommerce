@@ -4,7 +4,7 @@
 
 # Artifact Bucket (하나로 통합 관리)
 resource "aws_s3_bucket" "pipeline_artifacts" {
-  bucket        = "${var.project_name}-pipeline-artifacts-${random_id.suffix.hex}"
+  bucket = "${var.project_name}-pipeline-artifacts"
   force_destroy = true
 }
 
@@ -45,8 +45,8 @@ resource "aws_iam_role_policy" "codebuild_policy" {
         Resource = [
           "${aws_s3_bucket.pipeline_artifacts.arn}",
           "${aws_s3_bucket.pipeline_artifacts.arn}/*",
-          "${aws_s3_bucket.frontend.arn}",
-          "${aws_s3_bucket.frontend.arn}/*"
+          "${module.storage.frontend_bucket_arn}",
+          "${module.storage.frontend_bucket_arn}/*",
         ]
       },
       {
@@ -57,11 +57,6 @@ resource "aws_iam_role_policy" "codebuild_policy" {
       {
         Effect   = "Allow"
         Action   = ["ecr:*"]
-        Resource = ["*"]
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["ecs:UpdateService", "ecs:DescribeServices"]
         Resource = ["*"]
       },
       {
@@ -111,14 +106,7 @@ resource "aws_codebuild_project" "backend" {
       name  = "MODULE_NAME"
       value = each.key
     }
-    environment_variable {
-      name  = "ECS_CLUSTER"
-      value = aws_ecs_cluster.main.name
-    }
-    environment_variable {
-      name  = "ECS_SERVICE"
-      value = aws_ecs_service.msa[each.key].name
-    }
+
   }
 
   source {
@@ -198,7 +186,7 @@ resource "aws_codebuild_project" "frontend" {
     type            = "LINUX_CONTAINER"
     environment_variable {
       name  = "S3_BUCKET"
-      value = aws_s3_bucket.frontend.bucket
+      value = module.storage.frontend_bucket_name
     }
     environment_variable {
       name  = "CLOUDFRONT_ID"

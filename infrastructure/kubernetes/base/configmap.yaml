@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: production
+data:
+  SPRING_PROFILES_ACTIVE: "prod"
+  USER_SERVICE_URL: "http://user-service:8080"
+  PRODUCT_SERVICE_URL: "http://product-service:8080"
+  ORDER_SERVICE_URL: "http://order-service:8080"
+  USER_GRPC_URL: "static://user-service:9090"
+  PRODUCT_GRPC_URL: "static://product-service:9090"

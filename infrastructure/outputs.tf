@@ -15,7 +15,7 @@ output "alb_dns" {
 
 output "s3_bucket_name" {
   description = "프론트엔드 S3 버킷명 (빌드 파일 업로드용)"
-  value       = aws_s3_bucket.frontend.bucket
+  value       = module.storage.frontend_bucket_name
 }
 
 output "ecr_repository_urls" {
@@ -25,7 +25,7 @@ output "ecr_repository_urls" {
 
 output "frontend_deploy_command" {
   description = "프론트엔드 S3 배포 명령어"
-  value       = "aws s3 sync ./build s3://${aws_s3_bucket.frontend.bucket} --profile goorm --delete"
+  value       = "aws s3 sync ./build s3://${module.storage.frontend_bucket_name} --profile goorm --delete"
 }
 
 output "backend_push_command" {
@@ -35,15 +35,15 @@ output "backend_push_command" {
 
 output "elasticache_endpoint" {
   description = "ElastiCache Redis 엔드포인트"
-  value       = aws_elasticache_cluster.redis.cache_nodes[0].address
+  value       = module.storage.redis_endpoint
 }
 
 output "rds_endpoint" {
   description = "RDS PostgreSQL 엔드포인트"
-  value       = aws_db_instance.postgres.address
+  value       = module.storage.rds_endpoint
 }
 
 output "rds_port" {
   description = "RDS PostgreSQL 포트"
-  value       = aws_db_instance.postgres.port
+  value       = module.storage.rds_port
 }
