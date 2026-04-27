@@ -96,3 +96,32 @@ variable "db_password" {
   description = "RDS master password"
   sensitive   = true
 }
+
+############################################
+# EKS 설정
+############################################
+
+variable "eks_cluster_version" {
+  description = "EKS 클러스터 버전"
+  default     = "1.29"
+}
+
+variable "eks_node_instance_type" {
+  description = "EKS 워커 노드 인스턴스 타입"
+  default     = "t3.medium"
+}
+
+variable "eks_node_desired_size" {
+  description = "EKS 워커 노드 기본 수"
+  default     = 2
+}
+
+variable "eks_node_min_size" {
+  description = "EKS 워커 노드 최소 수"
+  default     = 1
+}
+
+variable "eks_node_max_size" {
+  description = "EKS 워커 노드 최대 수"
+  default     = 5
+}
