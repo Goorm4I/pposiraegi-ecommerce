@@ -1,0 +1,27 @@
+# order-service 카나리 트래픽 분리용 DestinationRule
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: order-service-dr
+  namespace: default
+spec:
+  host: order-service-stable
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        h2UpgradePolicy: UPGRADE
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+  subsets:
+    - name: stable
+      labels:
+        app: order-service
+        version: stable
+    - name: canary
+      labels:
+        app: order-service
+        version: canary

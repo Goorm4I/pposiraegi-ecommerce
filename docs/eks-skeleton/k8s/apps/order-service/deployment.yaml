@@ -1,0 +1,97 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: order-service
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+        version: stable
+    spec:
+      serviceAccountName: order-service  # IRSA 바인딩
+
+      # system 노드(On-Demand) 제외, app 노드(Spot)에만 스케줄
+      nodeSelector:
+        node-role: app
+
+      # Spot 노드 taint 허용
+      tolerations:
+        - key: "karpenter.sh/spot"
+          operator: "Exists"
+          effect: "NoSchedule"
+
+      containers:
+        - name: order-service
+          image: ${ECR_REGISTRY}/order-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: db-host
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: db-password
+            - name: REDIS_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: redis-host
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+
+  strategy:
+    canary:
+      canaryService: order-service-canary
+      stableService: order-service-stable
+      trafficRouting:
+        istio:
+          virtualService:
+            name: order-service-vs
+          destinationRule:
+            name: order-service-dr
+            canarySubsetName: canary
+            stableSubsetName: stable
+      steps:
+        - setWeight: 10
+        - pause:
+            duration: 5m
+        - analysis:
+            templates:
+              - templateName: success-rate
+        - setWeight: 50
+        - pause:
+            duration: 5m
+        - setWeight: 100
+      analysis:
+        startingStep: 2
