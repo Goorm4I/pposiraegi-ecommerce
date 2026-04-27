@@ -103,7 +103,7 @@ variable "db_password" {
 
 variable "eks_cluster_version" {
   description = "EKS 클러스터 버전"
-  default     = "1.29"
+  default     = "1.32"
 }
 
 variable "eks_node_instance_type" {
