@@ -1,0 +1,35 @@
+# kube-prometheus-stack Helm values
+# helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+#   -n monitoring --create-namespace -f prometheus-values.yaml
+
+grafana:
+  enabled: true
+  adminPassword: "changeme"  # 실제 배포 시 ESO SecretStore로 교체
+
+prometheus:
+  prometheusSpec:
+    # Istio 메트릭 수집 설정
+    additionalScrapeConfigs:
+      - job_name: 'istio-mesh'
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+                - istio-system
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: istio-telemetry;prometheus
+
+    # 리텐션 설정
+    retention: 7d
+    retentionSize: "10GB"
+
+    # Spot 노드에 스케줄 (시스템 노드 taint 회피)
+    tolerations:
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"
+        effect: "NoSchedule"
+
+alertmanager:
+  enabled: false  # 실습 환경에서는 비활성화

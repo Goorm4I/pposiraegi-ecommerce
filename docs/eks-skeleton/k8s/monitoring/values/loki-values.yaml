@@ -1,0 +1,21 @@
+# Loki Helm values (loki-stack)
+# helm install loki grafana/loki-stack \
+#   -n monitoring -f loki-values.yaml
+
+loki:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 10Gi
+
+promtail:
+  enabled: true
+  config:
+    snippets:
+      # 앱 로그에 Kubernetes 메타데이터 라벨 추가
+      pipelineStages:
+        - docker: {}
+        - labels:
+            app:
+            namespace:
+            pod:
