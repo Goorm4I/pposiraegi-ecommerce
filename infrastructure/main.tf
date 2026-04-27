@@ -84,7 +84,7 @@ module "eks" {
 }
 
 ###############################################################
-# ALB
+# ALB (EKS Ingress Controller에서 재사용)
 ###############################################################
 resource "aws_lb" "alb" {
   name               = "${var.project_name}-alb"
@@ -103,7 +103,7 @@ resource "aws_lb_target_group" "backend_tg" {
   target_type = "ip"
 
   health_check {
-    path                = "/v3/api-docs"
+    path                = "/actuator/health"
     interval            = 30
     timeout             = 10
     healthy_threshold   = 2
@@ -244,7 +244,7 @@ resource "aws_s3_bucket_policy" "frontend" {
 }
 
 ###############################################################
-# ECR Repositories (MSA)
+# ECR Repositories (MSA 이미지 저장소 - EKS에서 재사용)
 ###############################################################
 locals {
   services = toset(["api-gateway", "user-service", "product-service", "order-service"])
@@ -262,175 +262,12 @@ resource "aws_ecr_repository" "msa" {
 }
 
 ###############################################################
-# CloudWatch Logs (MSA)
+# CloudWatch Log Groups (EKS 서비스 로그용)
 ###############################################################
 resource "aws_cloudwatch_log_group" "msa" {
   for_each          = local.services
-  name              = "/ecs/${var.project_name}-${each.key}"
+  name              = "/eks/${var.project_name}-${each.key}"
   retention_in_days = 7
-}
-
-###############################################################
-# ECS Cluster & IAM Roles
-###############################################################
-resource "aws_ecs_cluster" "main" {
-  name = "${var.project_name}-cluster"
-}
-
-resource "aws_iam_role" "ecs_task_execution_role" {
-  name = "${var.project_name}-ecs-task-execution-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Service = "ecs-tasks.amazonaws.com" }
-      Action    = "sts:AssumeRole"
-    }]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
-  role       = aws_iam_role.ecs_task_execution_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
-
-resource "aws_iam_role_policy" "ecs_task_execution_ssm_policy" {
-  name = "${var.project_name}-ecs-ssm-policy"
-  role = aws_iam_role.ecs_task_execution_role.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = ["ssm:GetParameters"]
-      Resource = [
-        module.storage.jwt_secret_arn,
-        module.storage.db_password_arn
-      ]
-    }]
-  })
-}
-
-resource "aws_iam_role" "ecs_task_role" {
-  name = "${var.project_name}-ecs-task-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Service = "ecs-tasks.amazonaws.com" }
-      Action    = "sts:AssumeRole"
-    }]
-  })
-}
-
-###############################################################
-# AWS Cloud Map (Service Discovery)
-###############################################################
-resource "aws_service_discovery_private_dns_namespace" "internal" {
-  name        = "pposiraegi.internal"
-  description = "Private DNS namespace for microservices"
-  vpc         = module.networking.vpc_id
-}
-
-resource "aws_service_discovery_service" "msa" {
-  for_each = local.services
-
-  name = each.key
-
-  dns_config {
-    namespace_id = aws_service_discovery_private_dns_namespace.internal.id
-
-    dns_records {
-      ttl  = 10
-      type = "A"
-    }
-
-    routing_policy = "MULTIVALUE"
-  }
-
-  health_check_custom_config {
-    failure_threshold = 1
-  }
-}
-
-###############################################################
-# ECS Task Definitions (MSA)
-###############################################################
-resource "aws_ecs_task_definition" "msa" {
-  for_each                 = local.services
-  family                   = "${var.project_name}-${each.key}"
-  requires_compatibilities = ["FARGATE"]
-  network_mode             = "awsvpc"
-  cpu                      = 512
-  memory                   = 1024
-  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
-  task_role_arn            = aws_iam_role.ecs_task_role.arn
-
-  container_definitions = jsonencode([{
-    name      = each.key
-    image     = "${aws_ecr_repository.msa[each.key].repository_url}:latest"
-    essential = true
-    portMappings = [{
-      containerPort = 8080
-      hostPort      = 8080
-    }]
-    environment = [
-      { name = "SPRING_PROFILES_ACTIVE", value = "prod" },
-      { name = "DB_HOST", value = module.storage.rds_endpoint },
-      { name = "DB_USERNAME", value = var.db_username },
-      { name = "REDIS_HOST", value = module.storage.redis_endpoint },
-      { name = "CORS_ALLOWED_ORIGINS", value = "https://${aws_cloudfront_distribution.frontend.domain_name}" },
-      { name = "USER_SERVICE_URL", value = "http://user-service.pposiraegi.internal:8080" },
-      { name = "PRODUCT_SERVICE_URL", value = "http://product-service.pposiraegi.internal:8080" },
-      { name = "ORDER_SERVICE_URL", value = "http://order-service.pposiraegi.internal:8080" },
-      { name = "USER_GRPC_URL", value = "static://user-service.pposiraegi.internal:9090" },
-      { name = "PRODUCT_GRPC_URL", value = "static://product-service.pposiraegi.internal:9090" }
-    ]
-    secrets = [
-      { name = "DB_PASSWORD", valueFrom = module.storage.db_password_arn },
-      { name = "JWT_SECRET", valueFrom = module.storage.jwt_secret_arn }
-    ]
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.msa[each.key].name
-        "awslogs-region"        = var.region
-        "awslogs-stream-prefix" = "ecs"
-      }
-    }
-  }])
-}
-
-###############################################################
-# ECS Services (MSA)
-###############################################################
-resource "aws_ecs_service" "msa" {
-  for_each        = local.services
-  name            = "${var.project_name}-${each.key}-service"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.msa[each.key].arn
-  launch_type     = "FARGATE"
-  desired_count   = 1
-
-  network_configuration {
-    subnets          = [module.networking.private_subnet_a_id, module.networking.private_subnet_b_id]
-    security_groups  = each.key == "api-gateway" ? [module.security.api_gateway_sg_id] : [module.security.internal_msa_sg_id]
-    assign_public_ip = false
-  }
-
-  service_registries {
-    registry_arn = aws_service_discovery_service.msa[each.key].arn
-  }
-
-  dynamic "load_balancer" {
-    for_each = each.key == "api-gateway" ? [1] : []
-    content {
-      target_group_arn = aws_lb_target_group.backend_tg.arn
-      container_name   = each.key
-      container_port   = 8080
-    }
-  }
-
-  depends_on = [aws_lb_listener.http]
 }
 
 ###############################################################
@@ -503,4 +340,3 @@ resource "aws_route53_record" "www" {
     evaluate_target_health = false
   }
 }
-
