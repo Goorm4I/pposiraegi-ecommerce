@@ -125,20 +125,3 @@ resource "aws_iam_role_policy" "cluster_autoscaler" {
     }]
   })
 }
-
-###############################################################
-# EKS 클러스터
-###############################################################
-module "eks" {
-  source = "./modules/eks"
-
-  project_name       = var.project_name
-  vpc_id             = module.networking.vpc_id
-  private_subnet_ids = [module.networking.private_subnet_a_id, module.networking.private_subnet_b_id]
-  public_subnet_ids  = [module.networking.public_subnet_a_id, module.networking.public_subnet_b_id]
-  cluster_version    = var.eks_cluster_version
-  node_instance_type = var.eks_node_instance_type
-  node_desired_size  = var.eks_node_desired_size
-  node_min_size      = var.eks_node_min_size
-  node_max_size      = var.eks_node_max_size
-}
