@@ -61,11 +61,6 @@ resource "aws_iam_role_policy" "codebuild_policy" {
       },
       {
         Effect   = "Allow"
-        Action   = ["ecs:UpdateService", "ecs:DescribeServices"]
-        Resource = ["*"]
-      },
-      {
-        Effect   = "Allow"
         Action   = ["ssm:GetParameters"]
         Resource = ["arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${var.project_name}/*"]
       },
@@ -111,14 +106,7 @@ resource "aws_codebuild_project" "backend" {
       name  = "MODULE_NAME"
       value = each.key
     }
-    environment_variable {
-      name  = "ECS_CLUSTER"
-      value = aws_ecs_cluster.main.name
-    }
-    environment_variable {
-      name  = "ECS_SERVICE"
-      value = aws_ecs_service.msa[each.key].name
-    }
+
   }
 
   source {
