@@ -1,0 +1,56 @@
+## /actuator/prometheus 보안: Prometheus SA만 접근 허용 (L7 — waypoint 필요)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-prometheus-scrape
+  namespace: production
+spec:
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals:
+        - "cluster.local/ns/monitoring/sa/kube-prometheus-stack-prometheus"
+    to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/actuator/prometheus"]
+---
+## 서비스 간 내부 트래픽: production + api-gateway SA 허용
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-internal-traffic
+  namespace: production
+spec:
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        namespaces: ["production"]
+  - from:
+    - source:
+        principals:
+        - "cluster.local/ns/production/sa/api-gateway"
+---
+## Health check: ALB/kubelet → /actuator/health 허용 (L7)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-health-check
+  namespace: production
+spec:
+  action: ALLOW
+  rules:
+  - to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness"]
+---
+## 기본 deny-all (위 ALLOW에 매칭 안 되면 차단)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-all
+  namespace: production
+spec: {}

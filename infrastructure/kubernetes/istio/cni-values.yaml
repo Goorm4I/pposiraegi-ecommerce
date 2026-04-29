@@ -1,0 +1,19 @@
+## istio-cni — Ambient 모드 필수 (ztunnel 트래픽 인터셉트용)
+## helm upgrade --install istio-cni istio/cni -n kube-system -f cni-values.yaml
+
+profile: ambient
+
+# EKS는 Amazon VPC CNI와 충돌 방지
+cni:
+  cniBinDir: /opt/cni/bin
+  cniConfDir: /etc/cni/net.d
+  # Amazon VPC CNI 다음에 체이닝
+  chained: true
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 100Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi

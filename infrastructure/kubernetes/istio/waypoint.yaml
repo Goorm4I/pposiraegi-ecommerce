@@ -1,0 +1,49 @@
+## Waypoint Proxy — L7 정책(경로 기반 AuthorizationPolicy) 활성화
+## ztunnel(L4)과 달리 일반 Deployment → replicas + PDB로 HA 구성
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: waypoint
+  namespace: production
+  labels:
+    istio.io/waypoint-for: service
+spec:
+  gatewayClassName: istio-waypoint
+  listeners:
+  - name: mesh
+    port: 15008
+    protocol: HBONE
+---
+## Waypoint PDB — Spot 회수/drain 시 L7 정책 공백 방지
+## Karpenter의 10% disruption budget과 함께 동작
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: waypoint-pdb
+  namespace: production
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      gateway.networking.k8s.io/gateway-name: waypoint
+---
+## Waypoint HPA — L7 정책 프록시가 병목/SPOF가 되지 않도록 독립 스케일
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: waypoint-hpa
+  namespace: production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: waypoint
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70

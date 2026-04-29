@@ -17,6 +17,7 @@ spec:
         prometheus.io/port: "8080"
         prometheus.io/path: "/actuator/prometheus"
     spec:
+      serviceAccountName: user-service
       containers:
       - name: user-service
         image: 779846782353.dkr.ecr.ap-northeast-2.amazonaws.com/pposiraegi-user-service:latest

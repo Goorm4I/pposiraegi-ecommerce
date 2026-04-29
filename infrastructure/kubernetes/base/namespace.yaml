@@ -4,3 +4,5 @@ metadata:
   name: production
   labels:
     name: production
+    istio.io/dataplane-mode: ambient  # Istio Ambient L4 mTLS 활성화
+    istio.io/use-waypoint: waypoint    # L7 정책/텔레메트리가 필요한 service 트래픽만 waypoint 경유

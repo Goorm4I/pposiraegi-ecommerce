@@ -1,0 +1,31 @@
+## Istio Ambient 설치 순서
+## 1. helm repo add istio https://istio-release.storage.googleapis.com/charts
+## 2. helm install istio-base istio/base -n istio-system --create-namespace
+## 3. helm upgrade --install istiod istio/istiod -n istio-system -f istiod-values.yaml
+## 4. helm upgrade --install istio-cni istio/cni -n kube-system -f cni-values.yaml
+## 5. helm upgrade --install ztunnel istio/ztunnel -n istio-system -f ztunnel-values.yaml
+## 6. kubectl apply -f waypoint.yaml
+## 7. kubectl apply -f authorization-policy.yaml
+
+profile: ambient
+
+pilot:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+meshConfig:
+  # ambient 모드에서 mTLS 기본 STRICT
+  defaultConfig:
+    proxyMetadata:
+      ISTIO_META_ENABLE_HBONE: "true"
+  accessLogFile: /dev/stdout
+
+global:
+  istioNamespace: istio-system
+  # EKS IRSA 호환
+  platform: eks

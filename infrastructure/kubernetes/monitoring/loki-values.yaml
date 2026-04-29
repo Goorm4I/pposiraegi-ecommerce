@@ -62,7 +62,7 @@ promtail:
 # S3 접근용 IRSA (Terraform에서 role 생성 후 annotation 추가)
 serviceAccount:
   annotations:
-    eks.amazonaws.com/role-arn: "arn:aws:iam::779846782353:role/pposiraegi-loki-role"
+    eks.amazonaws.com/role-arn: "arn:aws:iam::${AWS_ACCOUNT_ID}:role/pposiraegi-loki-role"
 
 write:
   replicas: 1

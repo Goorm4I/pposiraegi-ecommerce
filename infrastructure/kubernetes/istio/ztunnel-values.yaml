@@ -1,0 +1,17 @@
+## ztunnel — 노드별 DaemonSet, L4 mTLS 처리
+## helm upgrade --install ztunnel istio/ztunnel -n istio-system -f ztunnel-values.yaml
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# EKS 노드 그룹 / Karpenter 노드 모두 커버 (DaemonSet이라 자동)
+tolerations:
+- operator: Exists
+  effect: NoSchedule
+- operator: Exists
+  effect: NoExecute
