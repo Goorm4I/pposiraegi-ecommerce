@@ -26,3 +26,8 @@ variable "azs" {
   description = "Availability zones"
   type        = list(string)
 }
+
+variable "cluster_name" {
+  description = "EKS cluster name — Karpenter/ALB discovery 태그에 사용"
+  type        = string
+}

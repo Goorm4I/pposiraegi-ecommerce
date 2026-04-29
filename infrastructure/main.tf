@@ -22,6 +22,10 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.0"
     }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
   }
 }
 
@@ -39,6 +43,7 @@ module "networking" {
   source = "./modules/networking"
 
   project_name          = var.project_name
+  cluster_name          = "${var.project_name}-cluster"
   vpc_cidr              = var.vpc_cidr
   public_subnet_a_cidr  = var.public_subnet_a_cidr
   public_subnet_b_cidr  = var.public_subnet_b_cidr
@@ -81,6 +86,20 @@ module "eks" {
   node_desired_size  = var.eks_node_desired_size
   node_min_size      = var.eks_node_min_size
   node_max_size      = var.eks_node_max_size
+}
+
+# 5. Karpenter (IAM IRSA, SQS 중단 이벤트, 노드 SG, 인스턴스 프로파일)
+module "karpenter" {
+  source = "./modules/karpenter"
+
+  project_name       = var.project_name
+  cluster_name       = "${var.project_name}-cluster"
+  cluster_endpoint   = module.eks.cluster_endpoint
+  oidc_provider_arn  = module.eks.oidc_provider_arn
+  oidc_provider_url  = module.eks.oidc_provider_url
+  node_role_arn      = module.eks.node_role_arn
+  vpc_id             = module.networking.vpc_id
+  private_subnet_ids = [module.networking.private_subnet_a_id, module.networking.private_subnet_b_id]
 }
 
 ###############################################################

@@ -30,14 +30,24 @@ resource "aws_subnet" "private_a" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = var.private_subnet_a_cidr
   availability_zone = var.azs[0]
-  tags = { Name = "${var.project_name}-private-a" }
+  tags = {
+    Name                                        = "${var.project_name}-private-a"
+    "karpenter.sh/discovery"                    = var.cluster_name
+    "kubernetes.io/role/internal-elb"           = "1"
+    "kubernetes.io/cluster/${var.cluster_name}" = "owned"
+  }
 }
 
 resource "aws_subnet" "private_b" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = var.private_subnet_b_cidr
   availability_zone = var.azs[1]
-  tags = { Name = "${var.project_name}-private-b" }
+  tags = {
+    Name                                        = "${var.project_name}-private-b"
+    "karpenter.sh/discovery"                    = var.cluster_name
+    "kubernetes.io/role/internal-elb"           = "1"
+    "kubernetes.io/cluster/${var.cluster_name}" = "owned"
+  }
 }
 
 resource "aws_route_table" "public_rt" {
