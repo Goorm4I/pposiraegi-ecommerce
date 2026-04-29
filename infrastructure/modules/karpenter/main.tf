@@ -51,6 +51,7 @@ resource "aws_iam_role_policy" "karpenter_controller" {
           "arn:aws:ec2:*:*:network-interface/*",
           "arn:aws:ec2:*:*:instance/*",
           "arn:aws:ec2:*:*:volume/*",
+          "arn:aws:ec2:*:*:fleet/*",
         ]
       },
       {
@@ -61,14 +62,28 @@ resource "aws_iam_role_policy" "karpenter_controller" {
           "ec2:CreateLaunchTemplate",
           "ec2:CreateFleet",
           "ec2:TerminateInstances",
-          "ec2:DeleteLaunchTemplate",
         ]
         Resource = ["*"]
         Condition = {
-          StringEquals = {
+          StringLike = {
+            # StringLike: 와일드카드 매칭 (StringEquals는 "*"를 리터럴로 해석)
             "aws:ResourceTag/karpenter.sh/nodepool" = "*"
           }
         }
+      },
+      {
+        # DeleteLaunchTemplate은 생성 직후 태그가 없을 수 있어 조건 없이 허용
+        Sid      = "AllowDeleteLaunchTemplate"
+        Effect   = "Allow"
+        Action   = ["ec2:DeleteLaunchTemplate"]
+        Resource = "arn:aws:ec2:*:*:launch-template/*"
+      },
+      {
+        # Spot 가격 데이터 조회 — 없으면 기본값 사용하지만 로그 노이즈 발생
+        Sid      = "AllowPricingReadActions"
+        Effect   = "Allow"
+        Action   = ["pricing:GetProducts"]
+        Resource = "*"
       },
       {
         Sid    = "AllowScopedResourceCreationTagging"
@@ -113,10 +128,24 @@ resource "aws_iam_role_policy" "karpenter_controller" {
         Resource = [aws_sqs_queue.karpenter_interruption.arn]
       },
       {
-        Sid    = "AllowPassNodeIAMRole"
-        Effect = "Allow"
-        Action = ["iam:PassRole"]
+        Sid      = "AllowPassNodeIAMRole"
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
         Resource = [var.node_role_arn]
+      },
+      {
+        # Karpenter v1: EC2NodeClass Ready 상태를 위해 Instance Profile CRUD 필요
+        Sid    = "AllowInstanceProfileActions"
+        Effect = "Allow"
+        Action = [
+          "iam:CreateInstanceProfile",
+          "iam:TagInstanceProfile",
+          "iam:AddRoleToInstanceProfile",
+          "iam:RemoveRoleFromInstanceProfile",
+          "iam:DeleteInstanceProfile",
+          "iam:GetInstanceProfile",
+        ]
+        Resource = "arn:aws:iam::*:instance-profile/*"
       },
       {
         Sid      = "AllowEKSReadActions"
@@ -125,9 +154,9 @@ resource "aws_iam_role_policy" "karpenter_controller" {
         Resource = ["arn:aws:eks:*:*:cluster/${var.cluster_name}"]
       },
       {
-        Sid    = "AllowInterruptionQueueActions"
-        Effect = "Allow"
-        Action = ["sqs:SendMessage"]
+        Sid      = "AllowInterruptionQueueActions"
+        Effect   = "Allow"
+        Action   = ["sqs:SendMessage"]
         Resource = [aws_sqs_queue.karpenter_interruption.arn]
       },
     ]
@@ -247,10 +276,10 @@ resource "aws_security_group" "eks_node" {
 
   # Istio HBONE (ztunnel 간 mTLS)
   ingress {
-    from_port = 15008
-    to_port   = 15008
-    protocol  = "tcp"
-    self      = true
+    from_port   = 15008
+    to_port     = 15008
+    protocol    = "tcp"
+    self        = true
     description = "Istio HBONE"
   }
 
@@ -266,4 +295,14 @@ resource "aws_security_group" "eks_node" {
     "karpenter.sh/discovery"                    = var.cluster_name
     "kubernetes.io/cluster/${var.cluster_name}" = "owned"
   }
+}
+
+resource "aws_security_group_rule" "cluster_api_from_karpenter_nodes" {
+  type                     = "ingress"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  security_group_id        = var.cluster_security_group_id
+  source_security_group_id = aws_security_group.eks_node.id
+  description              = "Allow Karpenter-managed nodes to join EKS API server"
 }

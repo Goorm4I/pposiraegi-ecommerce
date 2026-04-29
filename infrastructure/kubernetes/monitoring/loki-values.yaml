@@ -9,9 +9,13 @@ loki:
     replication_factor: 1  # 단일 AZ 실습환경, 프로덕션은 3 권장
   storage:
     type: s3
+    # Loki chart v6.x: bucketNames 필드 필수
+    bucketNames:
+      chunks: pposiraegi-loki-logs
+      ruler: pposiraegi-loki-logs
+      admin: pposiraegi-loki-logs
     s3:
       region: ap-northeast-2
-      bucketnames: pposiraegi-loki-logs  # Terraform으로 생성 필요
       s3ForcePathStyle: false
   schemaConfig:
     configs:

@@ -2,7 +2,7 @@ resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
-  tags = { Name = "${var.project_name}-vpc" }
+  tags                 = { Name = "${var.project_name}-vpc" }
 }
 
 resource "aws_internet_gateway" "igw" {
@@ -15,7 +15,7 @@ resource "aws_subnet" "public_a" {
   cidr_block              = var.public_subnet_a_cidr
   availability_zone       = var.azs[0]
   map_public_ip_on_launch = true
-  tags = { Name = "${var.project_name}-public-a" }
+  tags                    = { Name = "${var.project_name}-public-a" }
 }
 
 resource "aws_subnet" "public_b" {
@@ -23,7 +23,7 @@ resource "aws_subnet" "public_b" {
   cidr_block              = var.public_subnet_b_cidr
   availability_zone       = var.azs[1]
   map_public_ip_on_launch = true
-  tags = { Name = "${var.project_name}-public-b" }
+  tags                    = { Name = "${var.project_name}-public-b" }
 }
 
 resource "aws_subnet" "private_a" {

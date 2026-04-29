@@ -85,10 +85,9 @@ sonar {
         property "sonar.projectKey", "pposiraegi-ecommerce"
         property "sonar.projectName", "PPosiraegi E-commerce"
         property "sonar.host.url", "http://localhost:9000"
-        property "sonar.token", "squ_7e6f31e5153f34d283f58563ec584d08ff9fa579"
+        property "sonar.token", System.getenv("SONAR_TOKEN") ?: ""
         property "sonar.sources", "src/main/java"
         property "sonar.tests", "src/test/java"
         property "sonar.java.binaries", "build/classes"
     }
 }
-

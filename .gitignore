@@ -1,6 +1,33 @@
 # 로컬 전용 가이드 (GitHub에 올리지 않음)
 PROJECT_LOCAL.md
+AGENTS.local.md
 
 # 로컬 환경 파일
 *.local
+.env
+.env.*
+!.env.example
 .env.local
+
+# OS / editor metadata
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Terraform local state / plans
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+tfplan
+*.tfplan
+crash.log
+
+# Local AI/agent tool files
+.clinerules
+CLAUDE.local.md
+
+# Local diagnostics / private notes
+docs/terraform-eks-diagnostics.md

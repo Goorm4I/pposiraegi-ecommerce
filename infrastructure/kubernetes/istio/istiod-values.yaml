@@ -27,5 +27,3 @@ meshConfig:
 
 global:
   istioNamespace: istio-system
-  # EKS IRSA 호환
-  platform: eks

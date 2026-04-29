@@ -56,8 +56,9 @@ module "networking" {
 module "security" {
   source = "./modules/security"
 
-  project_name = var.project_name
-  vpc_id       = module.networking.vpc_id
+  project_name   = var.project_name
+  vpc_id         = module.networking.vpc_id
+  eks_node_sg_id = module.karpenter.node_sg_id
 }
 
 # 3. 스토리지 (RDS, ElastiCache, S3, SSM)
@@ -92,14 +93,15 @@ module "eks" {
 module "karpenter" {
   source = "./modules/karpenter"
 
-  project_name       = var.project_name
-  cluster_name       = "${var.project_name}-cluster"
-  cluster_endpoint   = module.eks.cluster_endpoint
-  oidc_provider_arn  = module.eks.oidc_provider_arn
-  oidc_provider_url  = module.eks.oidc_provider_url
-  node_role_arn      = module.eks.node_role_arn
-  vpc_id             = module.networking.vpc_id
-  private_subnet_ids = [module.networking.private_subnet_a_id, module.networking.private_subnet_b_id]
+  project_name              = var.project_name
+  cluster_name              = "${var.project_name}-cluster"
+  cluster_endpoint          = module.eks.cluster_endpoint
+  cluster_security_group_id = module.eks.cluster_security_group_id
+  oidc_provider_arn         = module.eks.oidc_provider_arn
+  oidc_provider_url         = module.eks.oidc_provider_url
+  node_role_arn             = module.eks.node_role_arn
+  vpc_id                    = module.networking.vpc_id
+  private_subnet_ids        = [module.networking.private_subnet_a_id, module.networking.private_subnet_b_id]
 }
 
 ###############################################################

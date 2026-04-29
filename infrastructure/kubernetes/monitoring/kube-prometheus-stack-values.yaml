@@ -16,13 +16,12 @@ grafana:
     datasources.yaml:
       apiVersion: 1
       datasources:
-      - name: Prometheus
-        type: prometheus
-        url: http://kube-prometheus-stack-prometheus:9090
-        isDefault: true
+      # Prometheus datasource는 chart가 자동 생성 (isDefault: true) — 중복 방지를 위해 선언 생략
       - name: Loki
         type: loki
         url: http://loki:3100
+        access: proxy
+        isDefault: false
   dashboardProviders:
     dashboardproviders.yaml:
       apiVersion: 1

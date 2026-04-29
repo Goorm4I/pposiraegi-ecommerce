@@ -4,7 +4,7 @@
 
 # Artifact Bucket (하나로 통합 관리)
 resource "aws_s3_bucket" "pipeline_artifacts" {
-  bucket = "${var.project_name}-pipeline-artifacts"
+  bucket        = "${var.project_name}-pipeline-artifacts"
   force_destroy = true
 }
 
@@ -33,8 +33,8 @@ resource "aws_iam_role_policy" "codebuild_policy" {
         Resource = ["*"]
       },
       {
-        Effect   = "Allow"
-        Action   = [
+        Effect = "Allow"
+        Action = [
           "s3:GetObject",
           "s3:GetObjectVersion",
           "s3:PutObject",
@@ -117,9 +117,9 @@ resource "aws_codebuild_project" "backend" {
 
 # CodePipeline for Backend with Path Filters
 resource "aws_codepipeline" "backend" {
-  for_each = local.services
-  name     = "${var.project_name}-${each.key}-pipeline"
-  role_arn = aws_iam_role.codepipeline_role.arn
+  for_each      = local.services
+  name          = "${var.project_name}-${each.key}-pipeline"
+  role_arn      = aws_iam_role.codepipeline_role.arn
   pipeline_type = "V2"
 
   artifact_store {
@@ -158,12 +158,12 @@ resource "aws_codepipeline" "backend" {
   stage {
     name = "BuildAndDeploy"
     action {
-      name             = "Build"
-      category         = "Build"
-      owner            = "AWS"
-      provider         = "CodeBuild"
-      input_artifacts  = ["source_output"]
-      version          = "1"
+      name            = "Build"
+      category        = "Build"
+      owner           = "AWS"
+      provider        = "CodeBuild"
+      input_artifacts = ["source_output"]
+      version         = "1"
       configuration = {
         ProjectName = aws_codebuild_project.backend[each.key].name
       }
@@ -181,9 +181,9 @@ resource "aws_codebuild_project" "frontend" {
   artifacts { type = "CODEPIPELINE" }
 
   environment {
-    compute_type    = "BUILD_GENERAL1_SMALL"
-    image           = "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
-    type            = "LINUX_CONTAINER"
+    compute_type = "BUILD_GENERAL1_SMALL"
+    image        = "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
+    type         = "LINUX_CONTAINER"
     environment_variable {
       name  = "S3_BUCKET"
       value = module.storage.frontend_bucket_name
@@ -201,8 +201,8 @@ resource "aws_codebuild_project" "frontend" {
 }
 
 resource "aws_codepipeline" "frontend" {
-  name     = "${var.project_name}-frontend-pipeline"
-  role_arn = aws_iam_role.codepipeline_role.arn
+  name          = "${var.project_name}-frontend-pipeline"
+  role_arn      = aws_iam_role.codepipeline_role.arn
   pipeline_type = "V2"
 
   artifact_store {
@@ -241,12 +241,12 @@ resource "aws_codepipeline" "frontend" {
   stage {
     name = "BuildAndDeploy"
     action {
-      name             = "Build"
-      category         = "Build"
-      owner            = "AWS"
-      provider         = "CodeBuild"
-      input_artifacts  = ["source_output"]
-      version          = "1"
+      name            = "Build"
+      category        = "Build"
+      owner           = "AWS"
+      provider        = "CodeBuild"
+      input_artifacts = ["source_output"]
+      version         = "1"
       configuration = {
         ProjectName = aws_codebuild_project.frontend.name
       }
@@ -276,8 +276,8 @@ resource "aws_iam_role_policy" "codepipeline_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = [
+        Effect = "Allow"
+        Action = [
           "s3:GetObject",
           "s3:GetObjectVersion",
           "s3:GetBucketLocation",

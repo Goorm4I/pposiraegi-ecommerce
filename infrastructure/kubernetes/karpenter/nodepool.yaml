@@ -34,10 +34,6 @@ spec:
           values:
             - ap-northeast-2a
             - ap-northeast-2c
-      tolerations:
-        - key: "karpenter.sh/spot"
-          operator: "Exists"
-          effect: "NoSchedule"
   disruption:
     consolidationPolicy: WhenEmptyOrUnderutilized
     consolidateAfter: 30s
