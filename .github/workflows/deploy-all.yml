@@ -8,7 +8,7 @@ on:
 env:
   AWS_REGION: ap-northeast-2
   TF_VERSION: 1.5.0
-  ECS_CLUSTER: pposiraegi-cluster
+  EKS_CLUSTER: pposiraegi-cluster
 
 jobs:
   terraform_apply:
@@ -83,9 +83,12 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-      - name: Force ECS deployment
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER }}
+
+      - name: Rollout restart (ArgoCD sync fallback)
         run: |
-          aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service pposiraegi-${{ matrix.service }}-service --force-new-deployment
+          kubectl rollout restart deployment/${{ matrix.service }} -n production
 
   frontend_deploy:
     name: Frontend Build & Deploy
