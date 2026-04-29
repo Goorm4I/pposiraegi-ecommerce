@@ -14,7 +14,7 @@ spec:
     port: 15008
     protocol: HBONE
   infrastructure:
-    replicas: 2  # SPOF 방지: Rolling Update 중에도 1개 유지
+    replicas: 2  # SPOF 방지: Rolling Update 중에도 1개 유지 (Istio 1.22+ / GEP-1645 필요)
 ---
 ## Waypoint PDB — Spot 회수/drain 시 L7 정책 공백 방지
 ## Karpenter의 10% disruption budget과 함께 동작

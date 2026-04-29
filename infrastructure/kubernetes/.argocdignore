@@ -1,0 +1,6 @@
+# Helm values 파일 — ArgoCD raw apply 대상 아님, helm upgrade 시 별도 사용
+monitoring/kube-prometheus-stack-values.yaml
+monitoring/loki-values.yaml
+istio/istiod-values.yaml
+istio/cni-values.yaml
+istio/ztunnel-values.yaml

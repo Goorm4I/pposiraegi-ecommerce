@@ -68,23 +68,29 @@ prometheus:
     podMonitorSelectorNilUsesHelmValues: false
     additionalScrapeConfigs:
     - job_name: spring-boot-services
+      # role: endpoints → Service 경유 스크래핑
+      # Istio Ambient에서 Pod IP 직접 스크래핑(role:pod)은 ztunnel L4만 통과,
+      # Waypoint L7 AuthorizationPolicy(/actuator/prometheus 경로 제한)가 적용되지 않음.
+      # endpoints role은 ClusterIP Service → Waypoint → Pod 경로를 따라 L7 정책 적용 가능.
       kubernetes_sd_configs:
-      - role: pod
+      - role: endpoints
         namespaces:
           names: [production]
       relabel_configs:
-      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
         action: keep
         regex: "true"
-      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
         action: replace
         target_label: __metrics_path__
         regex: (.+)
-      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+      - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
         action: replace
         target_label: __address__
         regex: ([^:]+)(?::\d+)?;(\d+)
         replacement: $1:$2
+      - source_labels: [__meta_kubernetes_service_name]
+        target_label: service
 
 alertmanager:
   enabled: true
