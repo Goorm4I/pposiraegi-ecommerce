@@ -1,0 +1,135 @@
+## kube-prometheus-stack Helm values
+## helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+## helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+##   -n monitoring --create-namespace -f kube-prometheus-stack-values.yaml
+
+grafana:
+  enabled: true
+  adminPassword: ""  # 실제 배포 시 External Secrets로 주입
+  ingress:
+    enabled: false   # AWS LBC Ingress 별도 적용
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClassName: gp3
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://kube-prometheus-stack-prometheus:9090
+        isDefault: true
+      - name: Loki
+        type: loki
+        url: http://loki:3100
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+      - name: default
+        orgId: 1
+        folder: pposiraegi
+        type: file
+        disableDeletion: false
+        options:
+          path: /var/lib/grafana/dashboards/default
+  dashboards:
+    default:
+      # JVM 메트릭 (Spring Boot actuator/micrometer)
+      jvm-micrometer:
+        gnetId: 4701
+        revision: 1
+        datasource: Prometheus
+      # Kubernetes 클러스터 전체
+      kubernetes-cluster:
+        gnetId: 7249
+        revision: 1
+        datasource: Prometheus
+      # Karpenter 노드 비용/활용도
+      karpenter:
+        gnetId: 20398
+        revision: 1
+        datasource: Prometheus
+
+prometheus:
+  prometheusSpec:
+    retention: 7d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+    # pposiraegi 네임스페이스 ServiceMonitor 자동 감지
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    additionalScrapeConfigs:
+    - job_name: spring-boot-services
+      kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: [production]
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: "true"
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 2Gi
+  config:
+    global:
+      slack_api_url: ""  # 실제 배포 시 Secret으로 주입
+    route:
+      group_by: [alertname, namespace]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      receiver: slack-notifications
+      routes:
+      - matchers:
+        - alertname =~ "KarpenterNodeDisruption|KarpenterNodeTermination"
+        receiver: slack-karpenter
+    receivers:
+    - name: slack-notifications
+      slack_configs:
+      - channel: "#pposiraegi-alerts"
+        title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+    - name: slack-karpenter
+      slack_configs:
+      - channel: "#pposiraegi-infra"
+        title: '[Karpenter] {{ .CommonLabels.alertname }}'
+        text: 'Node disruption detected: {{ range .Alerts }}{{ .Labels.node }}{{ end }}'
+
+# Spring Boot /actuator/prometheus 스크래핑용 어노테이션 (deployment에 추가 필요)
+# metadata.annotations:
+#   prometheus.io/scrape: "true"
+#   prometheus.io/port: "8080"
+#   prometheus.io/path: "/actuator/prometheus"
+
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true

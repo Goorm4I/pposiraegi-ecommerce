@@ -1,0 +1,83 @@
+## Loki (로그 수집) Helm values — Simple Scalable mode
+## helm repo add grafana https://grafana.github.io/helm-charts
+## helm upgrade --install loki grafana/loki \
+##   -n monitoring -f loki-values.yaml
+
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1  # 단일 AZ 실습환경, 프로덕션은 3 권장
+  storage:
+    type: s3
+    s3:
+      region: ap-northeast-2
+      bucketnames: pposiraegi-loki-logs  # Terraform으로 생성 필요
+      s3ForcePathStyle: false
+  schemaConfig:
+    configs:
+    - from: "2024-01-01"
+      store: tsdb
+      object_store: s3
+      schema: v13
+      index:
+        prefix: loki_index_
+        period: 24h
+
+# Promtail (각 노드에서 Pod 로그 수집)
+promtail:
+  enabled: true
+  config:
+    clients:
+    - url: http://loki:3100/loki/api/v1/push
+    snippets:
+      pipelineStages:
+      - docker: {}
+      # Spring Boot JSON 로그 파싱
+      - json:
+          expressions:
+            level: level
+            logger: logger_name
+            message: message
+            trace_id: mdc.traceId
+      - labels:
+          level:
+          logger:
+      - output:
+          source: message
+    scrapeConfigs:
+    - job_name: kubernetes-pods
+      kubernetes_sd_configs:
+      - role: pod
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace]
+        action: keep
+        regex: production|monitoring
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        target_label: app
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+
+# S3 접근용 IRSA (Terraform에서 role 생성 후 annotation 추가)
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::779846782353:role/pposiraegi-loki-role"
+
+write:
+  replicas: 1
+  persistence:
+    size: 10Gi
+    storageClass: gp3
+
+read:
+  replicas: 1
+  persistence:
+    size: 10Gi
+    storageClass: gp3
+
+backend:
+  replicas: 1
+  persistence:
+    size: 10Gi
+    storageClass: gp3
