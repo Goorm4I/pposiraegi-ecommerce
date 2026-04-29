@@ -13,6 +13,8 @@ spec:
   - name: mesh
     port: 15008
     protocol: HBONE
+  infrastructure:
+    replicas: 2  # SPOF 방지: Rolling Update 중에도 1개 유지
 ---
 ## Waypoint PDB — Spot 회수/drain 시 L7 정책 공백 방지
 ## Karpenter의 10% disruption budget과 함께 동작
@@ -26,24 +28,3 @@ spec:
   selector:
     matchLabels:
       gateway.networking.k8s.io/gateway-name: waypoint
----
-## Waypoint HPA — L7 정책 프록시가 병목/SPOF가 되지 않도록 독립 스케일
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: waypoint-hpa
-  namespace: production
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: waypoint
-  minReplicas: 2
-  maxReplicas: 4
-  metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
