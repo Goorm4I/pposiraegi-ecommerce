@@ -78,15 +78,16 @@ module "storage" {
 module "eks" {
   source = "./modules/eks"
 
-  project_name       = var.project_name
-  vpc_id             = module.networking.vpc_id
-  private_subnet_ids = [module.networking.private_subnet_a_id, module.networking.private_subnet_b_id]
-  public_subnet_ids  = [module.networking.public_subnet_a_id, module.networking.public_subnet_b_id]
-  cluster_version    = var.eks_cluster_version
-  node_instance_type = var.eks_node_instance_type
-  node_desired_size  = var.eks_node_desired_size
-  node_min_size      = var.eks_node_min_size
-  node_max_size      = var.eks_node_max_size
+  project_name         = var.project_name
+  vpc_id               = module.networking.vpc_id
+  private_subnet_ids   = [module.networking.private_subnet_a_id, module.networking.private_subnet_b_id]
+  public_subnet_ids    = [module.networking.public_subnet_a_id, module.networking.public_subnet_b_id]
+  cluster_version      = var.eks_cluster_version
+  node_instance_type   = var.eks_node_instance_type
+  node_desired_size    = var.eks_node_desired_size
+  node_min_size        = var.eks_node_min_size
+  node_max_size        = var.eks_node_max_size
+  admin_principal_arns = var.eks_admin_principal_arns
 }
 
 # 5. Karpenter (IAM IRSA, SQS 중단 이벤트, 노드 SG, 인스턴스 프로파일)

@@ -6,6 +6,10 @@ resource "aws_eks_cluster" "main" {
   version  = var.cluster_version
   role_arn = aws_iam_role.eks_cluster_role.arn
 
+  access_config {
+    authentication_mode = "API_AND_CONFIG_MAP"
+  }
+
   vpc_config {
     subnet_ids              = concat(var.private_subnet_ids, var.public_subnet_ids)
     endpoint_private_access = true
@@ -17,6 +21,29 @@ resource "aws_eks_cluster" "main" {
   ]
 
   tags = { Name = "${var.project_name}-eks-cluster" }
+}
+
+###############################################################
+# EKS Access Entries — 팀 kubectl 접근 권한
+###############################################################
+resource "aws_eks_access_entry" "cluster_admins" {
+  for_each = toset(var.admin_principal_arns)
+
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = each.value
+  type          = "STANDARD"
+}
+
+resource "aws_eks_access_policy_association" "cluster_admins" {
+  for_each = aws_eks_access_entry.cluster_admins
+
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = each.value.principal_arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+  access_scope {
+    type = "cluster"
+  }
 }
 
 ###############################################################

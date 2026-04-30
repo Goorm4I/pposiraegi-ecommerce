@@ -125,3 +125,12 @@ variable "eks_node_max_size" {
   description = "EKS 워커 노드 최대 수"
   default     = 5
 }
+
+variable "eks_admin_principal_arns" {
+  description = "EKS cluster admin access entries for team operators"
+  type        = list(string)
+  default = [
+    "arn:aws:iam::779846782353:user/jihoon",
+    "arn:aws:iam::779846782353:user/nahyung",
+  ]
+}

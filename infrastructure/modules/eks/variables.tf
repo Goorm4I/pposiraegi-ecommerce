@@ -35,3 +35,9 @@ variable "node_min_size" {
 variable "node_max_size" {
   description = "EKS worker node max count"
 }
+
+variable "admin_principal_arns" {
+  description = "IAM principal ARNs granted EKS cluster admin access"
+  type        = list(string)
+  default     = []
+}
