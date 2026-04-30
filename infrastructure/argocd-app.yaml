@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/Goorm4I/pposiraegi-ecommerce
-    targetRevision: feat/eks-migration
+    targetRevision: main
     path: infrastructure/kubernetes
     directory:
       recurse: true

@@ -135,6 +135,7 @@ install_argocd() {
     --namespace argocd \
     --version "${ARGOCD_VERSION}" \
     --set server.service.type=ClusterIP \
+    --set applicationSet.enabled=false \
     --set configs.params."server\.insecure"=true \
     --wait --timeout 5m
     # server.insecure=true: TLS 종료를 ALB/Ingress에 위임하는 구조 (내부 ClusterIP 전용)
