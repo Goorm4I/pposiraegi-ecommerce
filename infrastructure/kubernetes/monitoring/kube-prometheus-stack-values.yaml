@@ -6,6 +6,8 @@
 grafana:
   enabled: true
   adminPassword: ""  # 실제 배포 시 External Secrets로 주입
+  deploymentStrategy:
+    type: Recreate  # RWO PVC Multi-Attach 방지
   ingress:
     enabled: false   # AWS LBC Ingress 별도 적용
   persistence:

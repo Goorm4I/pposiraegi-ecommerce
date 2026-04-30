@@ -68,6 +68,26 @@ serviceAccount:
   annotations:
     eks.amazonaws.com/role-arn: "arn:aws:iam::${AWS_ACCOUNT_ID}:role/pposiraegi-loki-role"
 
+# 실습용 .large NodePool 기준: Loki 기본 memcached chunks-cache는 약 10Gi 메모리를 요구한다.
+# 비용 최적화 노드 정책과 충돌하므로 캐시 계층은 끄고, S3 + 단일 replica 구성부터 안정화한다.
+chunksCache:
+  enabled: false
+
+resultsCache:
+  enabled: false
+
+test:
+  enabled: false
+
+lokiCanary:
+  enabled: false
+
+gateway:
+  nginxConfig:
+    # 기본값은 kube-dns FQDN인데 nginx 시작 시점 DNS 조회 실패로 CrashLoop가 발생할 수 있다.
+    # EKS 기본 Service CIDR 기준 kube-dns ClusterIP를 직접 사용한다.
+    resolver: "172.20.0.10"
+
 write:
   replicas: 1
   persistence:

@@ -33,7 +33,7 @@ spec:
           operator: In
           values:
             - ap-northeast-2a
-            - ap-northeast-2c
+            - ap-northeast-2b
   disruption:
     consolidationPolicy: WhenEmptyOrUnderutilized
     consolidateAfter: 30s

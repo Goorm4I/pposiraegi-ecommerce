@@ -1,6 +1,10 @@
 ###############################################################
 # Karpenter Controller IAM Role (IRSA)
 ###############################################################
+resource "aws_iam_service_linked_role" "spot" {
+  aws_service_name = "spot.amazonaws.com"
+}
+
 data "aws_iam_policy_document" "karpenter_assume" {
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -305,4 +309,24 @@ resource "aws_security_group_rule" "cluster_api_from_karpenter_nodes" {
   security_group_id        = var.cluster_security_group_id
   source_security_group_id = aws_security_group.eks_node.id
   description              = "Allow Karpenter-managed nodes to join EKS API server"
+}
+
+resource "aws_security_group_rule" "cluster_nodes_from_karpenter_nodes" {
+  type                     = "ingress"
+  from_port                = 0
+  to_port                  = 0
+  protocol                 = "-1"
+  security_group_id        = var.cluster_security_group_id
+  source_security_group_id = aws_security_group.eks_node.id
+  description              = "Allow pod/node traffic from Karpenter nodes to managed nodes"
+}
+
+resource "aws_security_group_rule" "karpenter_nodes_from_cluster_nodes" {
+  type                     = "ingress"
+  from_port                = 0
+  to_port                  = 0
+  protocol                 = "-1"
+  security_group_id        = aws_security_group.eks_node.id
+  source_security_group_id = var.cluster_security_group_id
+  description              = "Allow pod/node traffic from managed nodes to Karpenter nodes"
 }
