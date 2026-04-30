@@ -53,6 +53,7 @@ module "security" {
 
   project_name = var.project_name
   vpc_id       = module.networking.vpc_id
+  eks_cluster_sg_id = module.eks.cluster_security_group_id
 }
 
 # 3. 스토리지 (RDS, ElastiCache, S3, SSM)
