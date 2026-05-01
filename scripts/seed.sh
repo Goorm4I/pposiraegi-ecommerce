@@ -28,7 +28,7 @@ call_api() {
     -H "Content-Type: application/json" \
     -d "$body")
   local http_code=$(echo "$response" | tail -1)
-  local body_resp=$(echo "$response" | head -n -1)
+  local body_resp=$(echo "$response" | sed '$d')
   if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
     echo "[ERROR] $method $path → HTTP $http_code" >&2
     echo "$body_resp" >&2

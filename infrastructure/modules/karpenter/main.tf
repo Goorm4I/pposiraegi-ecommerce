@@ -299,6 +299,12 @@ resource "aws_security_group" "eks_node" {
     "karpenter.sh/discovery"                    = var.cluster_name
     "kubernetes.io/cluster/${var.cluster_name}" = "owned"
   }
+
+  lifecycle {
+    # Additional node-to-node rules are managed by standalone aws_security_group_rule resources.
+    # Without this, Terraform treats those rules as drift on the inline ingress set.
+    ignore_changes = [ingress]
+  }
 }
 
 resource "aws_security_group_rule" "cluster_api_from_karpenter_nodes" {

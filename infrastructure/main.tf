@@ -126,6 +126,7 @@ resource "aws_lb_target_group" "backend_tg" {
 
   health_check {
     path                = "/actuator/health"
+    port                = "8081"
     interval            = 30
     timeout             = 10
     healthy_threshold   = 2
@@ -134,6 +135,46 @@ resource "aws_lb_target_group" "backend_tg" {
   }
 
   tags = { Name = "${var.project_name}-tg" }
+}
+
+resource "aws_security_group_rule" "alb_to_managed_nodes_http" {
+  type                     = "ingress"
+  from_port                = 8080
+  to_port                  = 8080
+  protocol                 = "tcp"
+  security_group_id        = module.eks.cluster_security_group_id
+  source_security_group_id = module.security.alb_sg_id
+  description              = "Allow ALB to reach api-gateway application port on managed EKS nodes"
+}
+
+resource "aws_security_group_rule" "alb_to_managed_nodes_management" {
+  type                     = "ingress"
+  from_port                = 8081
+  to_port                  = 8081
+  protocol                 = "tcp"
+  security_group_id        = module.eks.cluster_security_group_id
+  source_security_group_id = module.security.alb_sg_id
+  description              = "Allow ALB health checks to reach management port on managed EKS nodes"
+}
+
+resource "aws_security_group_rule" "alb_to_karpenter_nodes_http" {
+  type                     = "ingress"
+  from_port                = 8080
+  to_port                  = 8080
+  protocol                 = "tcp"
+  security_group_id        = module.karpenter.node_sg_id
+  source_security_group_id = module.security.alb_sg_id
+  description              = "Allow ALB to reach api-gateway application port on Karpenter nodes"
+}
+
+resource "aws_security_group_rule" "alb_to_karpenter_nodes_management" {
+  type                     = "ingress"
+  from_port                = 8081
+  to_port                  = 8081
+  protocol                 = "tcp"
+  security_group_id        = module.karpenter.node_sg_id
+  source_security_group_id = module.security.alb_sg_id
+  description              = "Allow ALB health checks to reach management port on Karpenter nodes"
 }
 
 resource "aws_lb_listener" "http" {
