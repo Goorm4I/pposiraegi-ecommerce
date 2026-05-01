@@ -14,7 +14,7 @@ spec:
         app: api-gateway
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "8080"
+        prometheus.io/port: "8081"
         prometheus.io/path: "/actuator/prometheus"
     spec:
       serviceAccountName: api-gateway
@@ -23,6 +23,8 @@ spec:
         image: 779846782353.dkr.ecr.ap-northeast-2.amazonaws.com/pposiraegi-api-gateway:latest
         ports:
         - containerPort: 8080
+        - containerPort: 8081
+          name: management
         envFrom:
         - configMapRef:
             name: app-config
@@ -62,7 +64,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /actuator/health/readiness
-            port: 8080
+            port: 8081
           initialDelaySeconds: 40
           periodSeconds: 10
           timeoutSeconds: 5
@@ -70,7 +72,7 @@ spec:
         livenessProbe:
           httpGet:
             path: /actuator/health/liveness
-            port: 8080
+            port: 8081
           initialDelaySeconds: 90
           periodSeconds: 15
           timeoutSeconds: 5

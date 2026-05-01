@@ -300,14 +300,14 @@ install_monitoring() {
 
   kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
 
-  log "  6-1. kube-prometheus-stack"
+  log "  7-1. kube-prometheus-stack"
   helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
     --namespace monitoring \
     --version "${PROM_STACK_VERSION}" \
     -f "${K8S_DIR}/monitoring/kube-prometheus-stack-values.yaml" \
     --wait --timeout 10m
 
-  log "  6-2. Loki (S3 IRSA annotation 포함)"
+  log "  7-2. Loki (S3 IRSA annotation 포함)"
   # loki-values.yaml의 ${AWS_ACCOUNT_ID} 플레이스홀더를 실제 값으로 치환
   local loki_values
   loki_values="$(sed "s|\${AWS_ACCOUNT_ID}|${AWS_ACCOUNT_ID}|g" \

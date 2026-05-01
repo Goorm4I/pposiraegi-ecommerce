@@ -1,3 +1,27 @@
+## /actuator/prometheus 보안: Prometheus SA 외 접근 선차단 (L7 — waypoint 필요)
+## Istio AuthorizationPolicy는 DENY가 ALLOW보다 우선한다.
+## 따라서 아래의 넓은 internal allow가 있어도 metrics 경로는 Prometheus만 접근 가능하다.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-prometheus-non-prometheus
+  namespace: production
+spec:
+  targetRefs:
+  - kind: Gateway
+    group: gateway.networking.k8s.io
+    name: waypoint
+  action: DENY
+  rules:
+  - from:
+    - source:
+        notPrincipals:
+        - "cluster.local/ns/monitoring/sa/kube-prometheus-stack-prometheus"
+    to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/actuator/prometheus"]
+---
 ## /actuator/prometheus 보안: Prometheus SA만 접근 허용 (L7 — waypoint 필요)
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
@@ -5,6 +29,10 @@ metadata:
   name: allow-prometheus-scrape
   namespace: production
 spec:
+  targetRefs:
+  - kind: Gateway
+    group: gateway.networking.k8s.io
+    name: waypoint
   action: ALLOW
   rules:
   - from:
@@ -23,6 +51,10 @@ metadata:
   name: allow-internal-traffic
   namespace: production
 spec:
+  targetRefs:
+  - kind: Gateway
+    group: gateway.networking.k8s.io
+    name: waypoint
   action: ALLOW
   rules:
   - from:
@@ -40,6 +72,10 @@ metadata:
   name: allow-health-check
   namespace: production
 spec:
+  targetRefs:
+  - kind: Gateway
+    group: gateway.networking.k8s.io
+    name: waypoint
   action: ALLOW
   rules:
   - to:
@@ -53,4 +89,8 @@ kind: AuthorizationPolicy
 metadata:
   name: deny-all
   namespace: production
-spec: {}
+spec:
+  targetRefs:
+  - kind: Gateway
+    group: gateway.networking.k8s.io
+    name: waypoint

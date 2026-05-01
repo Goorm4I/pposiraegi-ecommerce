@@ -45,3 +45,15 @@ cors:
   allowed-origins:
     - "http://localhost:3000"
     - "https://pposiraegi.cloud"
+
+management:
+  server:
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
