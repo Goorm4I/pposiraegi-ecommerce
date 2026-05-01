@@ -44,6 +44,6 @@ ENV MODULE_NAME=${MODULE_NAME}
 COPY --from=build /app/backend/${MODULE_NAME}/build/libs/*.jar app.jar
 
 ENV JAVA_OPTS="-Xms512m -Xmx512m -Duser.timezone=Asia/Seoul -Djava.security.egd=file:/dev/./urandom"
-EXPOSE 8080
+EXPOSE 8080 8081
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
