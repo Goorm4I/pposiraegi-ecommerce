@@ -4,7 +4,7 @@ metadata:
   name: product-service
   annotations:
     prometheus.io/scrape: "true"
-    prometheus.io/port: "8080"
+    prometheus.io/port: "8081"
     prometheus.io/path: "/actuator/prometheus"
   namespace: production
 spec:
