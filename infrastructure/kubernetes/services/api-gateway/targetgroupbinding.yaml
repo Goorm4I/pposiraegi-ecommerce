@@ -1,0 +1,13 @@
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: TargetGroupBinding
+metadata:
+  name: api-gateway-tgb
+  namespace: production
+spec:
+  # Terraform owns the ALB and target group.
+  # AWS Load Balancer Controller only binds Kubernetes endpoints to this target group.
+  targetGroupName: pposiraegi-tg
+  targetType: ip
+  serviceRef:
+    name: api-gateway
+    port: 8080
