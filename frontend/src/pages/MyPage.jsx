@@ -21,7 +21,7 @@ const MyPage = () => {
 
   useEffect(() => {
     if (!user) navigate('/login');
-  }, []);
+  }, [navigate, user]);
 
   const [activeSection, setActiveSection] = useState(null);
 
@@ -222,11 +222,12 @@ const PhoneSection = ({ user }) => {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
 
-  const handleChange = (e) => {
+const handleChange = (e) => {
     let v = e.target.value.replace(/[^0-9]/g, '');
-    if (v.length <= 3) v = v;
-    else if (v.length <= 7) v = `${v.slice(0,3)}-${v.slice(3)}`;
-    else v = `${v.slice(0,3)}-${v.slice(3,7)}-${v.slice(7,11)}`;
+    if (v.length <= 7) 
+      v = v.length <= 3 ? v : `${v.slice(0,3)}-${v.slice(3)}`;
+    else 
+      v = `${v.slice(0,3)}-${v.slice(3,7)}-${v.slice(7,11)}`;
     setPhone(v);
     setError('');
   };

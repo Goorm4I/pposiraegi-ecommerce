@@ -23,7 +23,7 @@ const OrderResult = () => {
     if (!order) {
       fetchOrder();
     }
-  }, [id]);
+  }, [id, order]);
 
   const fetchOrder = async () => {
     try {

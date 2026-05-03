@@ -54,7 +54,7 @@ const AdminPage = () => {
   useEffect(() => {
     fetchDeals();
     getCategories().then(setCategories).catch(() => {});
-  }, []);
+  }, [fetchDeals]);
 
   const fetchDeals = async () => {
     try {

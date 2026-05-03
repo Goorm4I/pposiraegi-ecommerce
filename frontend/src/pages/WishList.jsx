@@ -15,7 +15,7 @@ const WishList = () => {
       return;
     }
     loadWishList();
-  }, [user]);
+  }, [user, navigate]);
 
   const loadWishList = () => {
     const currentUser = getCurrentUser();

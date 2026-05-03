@@ -20,35 +20,14 @@ const TimeDealDetail = () => {
   const [stockError, setStockError] = useState(null);
   const [alreadyPurchased, setAlreadyPurchased] = useState(false);
 
-  // 배송지 미등록 안내 배너
   const user = getCurrentUser();
   const [showAddressBanner, setShowAddressBanner] = useState(
     () => !!user && !getAddress()
   );
 
-  useEffect(() => {
-    window.scrollTo(0, 0);
-    fetchDeal();
-    fetchRelatedDeals();
-    setSelectedImage(0);
-    // 이미 구매한 딜인지 확인
-    if (user) {
-      const key = `paid_deal_${user.id}_${id}`;
-      setAlreadyPurchased(!!sessionStorage.getItem(key));
-    } else {
-      setAlreadyPurchased(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    if (!deal) return;
-    const interval = setInterval(fetchDeal, 5000);
-    return () => clearInterval(interval);
-  }, [deal]);
-
-  const fetchDeal = async () => {
+  const fetchDeal = useCallback(async () => {
     try {
-      if (!deal) setLoading(true);
+      setLoading(prev => prev);
       const data = await getTimeDeal(id);
       setDeal(data);
     } catch (err) {
@@ -56,9 +35,9 @@ const TimeDealDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const fetchRelatedDeals = async () => {
+  const fetchRelatedDeals = useCallback(async () => {
     try {
       const all = await getTimeDeals();
       const related = all
@@ -66,9 +45,28 @@ const TimeDealDetail = () => {
         .slice(0, 3);
       setRelatedDeals(related);
     } catch {}
-  };
+  }, [id]);
 
-  // ACTIVE → ENDED
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    fetchDeal();
+    fetchRelatedDeals();
+    setSelectedImage(0);
+    if (user) {
+      const key = `paid_deal_${user.id}_${id}`;
+      setAlreadyPurchased(!!sessionStorage.getItem(key));
+    } else {
+      setAlreadyPurchased(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  useEffect(() => {
+    if (!deal) return;
+    const interval = setInterval(fetchDeal, 5000);
+    return () => clearInterval(interval);
+  }, [deal, fetchDeal]);
+
   const handleDealExpire = useCallback(() => {
     setDeal(prev => {
       if (!prev || prev.status !== 'ACTIVE') return prev;
@@ -76,7 +74,6 @@ const TimeDealDetail = () => {
     });
   }, []);
 
-  // ✅ UPCOMING → ACTIVE: 오픈 예정 딜 시작 시간 도달 시 즉시 전환
   const handleDealStart = useCallback(() => {
     setDeal(prev => {
       if (!prev || prev.status !== 'UPCOMING') return prev;
@@ -115,15 +112,12 @@ const TimeDealDetail = () => {
 
   return (
     <div className="min-h-screen bg-[#faf6f0] flex flex-col">
-      {/* 헤더 — 메인페이지와 동일 */}
       <header className="bg-[#faf6f0] border-b border-brand-100 relative z-10 isolate">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
-            {/* 로고 */}
             <Link to="/" className="flex items-center hover:opacity-75 transition">
               <img src="/icon1.png" alt="뽀시래기" className="h-10 object-contain" />
             </Link>
-            {/* 우측 버튼 */}
             <div className="flex items-center gap-1">
               {user ? (
                 <>
@@ -161,11 +155,9 @@ const TimeDealDetail = () => {
       </header>
 
       <main className="flex-1 pb-4">
-        {/* 이미지 갤러리 */}
         <div className="bg-transparent">
           <div className="container mx-auto px-4 py-4 max-w-3xl">
             <div className="relative bg-brand-100 rounded-2xl overflow-hidden mb-3">
-              {/* 모든 이미지를 미리 렌더링, translateX로 전환 → src 변경 없이 부드럽게 슬라이드 */}
               <div
                 className="flex transition-transform duration-300 ease-in-out"
                 style={{ transform: `translateX(-${selectedImage * 100}%)` }}
@@ -221,7 +213,6 @@ const TimeDealDetail = () => {
           </div>
         </div>
 
-        {/* 상품 정보 */}
         <div className="bg-white rounded-2xl mt-4 p-6 max-w-3xl mx-auto shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -298,11 +289,8 @@ const TimeDealDetail = () => {
         )}
       </main>
 
-      {/* 하단 구매 바 */}
       <div className="sticky bottom-0 bg-white border-t border-brand-200 z-50">
         <div className="container mx-auto px-4 py-4 max-w-3xl">
-
-          {/* 배송지 미등록 안내 배너 */}
           {showAddressBanner && (
             <div className="mb-3 p-3 bg-brand-50 border border-brand-200 rounded-2xl flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center flex-shrink-0">
@@ -379,7 +367,6 @@ const TimeDealDetail = () => {
           </div>
         </div>
       </div>
-
     </div>
   );
 };

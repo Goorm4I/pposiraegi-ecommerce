@@ -3,13 +3,13 @@ import { getTimeDeals } from '../api/timedeal';
 import TimeDealCard from '../components/TimeDealCard';
 import CountdownTimer from '../components/CountdownTimer';
 import { Link, useNavigate } from 'react-router-dom';
-import { getCurrentUser, logout } from '../api/auth';
+import { getCurrentUser } from '../api/auth';
 
 const TimeDealList = () => {
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [user, setUser] = useState(getCurrentUser());
+  const [user] = useState(getCurrentUser());
   const [authKey, setAuthKey] = useState(0);
   const [activeFilter, setActiveFilter] = useState('popular');
   const [filterOpen, setFilterOpen] = useState(false);

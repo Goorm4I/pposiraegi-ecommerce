@@ -27,7 +27,7 @@ const AddressManager = () => {
       script.async = true;
       document.head.appendChild(script);
     }
-  }, []);
+  }, [navigate, user]);
 
   const handleAddressSearch = () => {
     new window.daum.Postcode({
