@@ -40,7 +40,7 @@ jobs:
         run: terraform init
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve -var="db_password=${{ secrets.DB_PASSWORD }}" -var="jwt_secret=${{ secrets.JWT_SECRET }}"
 
       - name: Extract Terraform Outputs
         id: tf_outputs
