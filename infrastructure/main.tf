@@ -56,15 +56,10 @@ module "networking" {
 module "security" {
   source = "./modules/security"
 
-<<<<<<< HEAD
-  project_name   = var.project_name
-  vpc_id         = module.networking.vpc_id
-  eks_node_sg_id = module.karpenter.node_sg_id
-=======
-  project_name = var.project_name
-  vpc_id       = module.networking.vpc_id
+  project_name      = var.project_name
+  vpc_id            = module.networking.vpc_id
+  eks_node_sg_id    = module.karpenter.node_sg_id
   eks_cluster_sg_id = module.eks.cluster_security_group_id
->>>>>>> origin/feat/eks-migration
 }
 
 # 3. 스토리지 (RDS, ElastiCache, S3, SSM)

@@ -42,7 +42,7 @@ jobs:
       - name: Create terraform.tfvars
         run: |
           cat > terraform.tfvars <<EOF
-          aws_profile           = "goorm"
+          aws_profile           = ""
           region                = "ap-northeast-2"
           project_name          = "pposiraegi"
           vpc_cidr              = "10.0.0.0/16"
@@ -97,7 +97,6 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: pposiraegi-${{ matrix.service }}
           IMAGE_TAG: ${{ github.sha }}
-        working-directory: ./backend
         run: |
           docker build --build-arg MODULE_NAME=${{ matrix.service }} -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
@@ -132,7 +131,7 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Build Frontend
-        run: pnpm turbo run build --filter=frontend
+        run: pnpm turbo run build --filter=timedeal-front
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
