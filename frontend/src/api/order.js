@@ -115,4 +115,5 @@ export const getMyOrders = async () => {
   return res.data?.data ?? [];
 };
 
-export default { createOrderSheet, submitOrder, createOrder, payOrder, getOrder, getMyOrders };
+const orderAPI = { createOrderSheet, submitOrder, createOrder, payOrder, getOrder, getMyOrders };
+export default orderAPI;

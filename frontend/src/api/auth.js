@@ -164,4 +164,5 @@ axios.interceptors.response.use(
   }
 );
 
-export default { login, register, logout, getCurrentUser, saveAddress, getAddress };
+const authAPI = { login, register, logout, getCurrentUser, saveAddress, getAddress };
+export default authAPI;

@@ -179,4 +179,5 @@ export const deleteTimeDeal = async (id) => {
   throw new Error('백엔드에서 타임딜 삭제 API를 지원하지 않습니다.');
 };
 
-export default { getTimeDeals, getTimeDeal, createTimeDeal, updateTimeDeal, deleteTimeDeal };
+const timedealAPI = { getTimeDeals, getTimeDeal, createTimeDeal, updateTimeDeal, deleteTimeDeal };
+export default timedealAPI;
