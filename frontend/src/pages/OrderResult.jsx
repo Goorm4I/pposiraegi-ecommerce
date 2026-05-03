@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { getOrder } from '../api/order';
 
@@ -23,20 +23,7 @@ const OrderResult = () => {
     if (!order) {
       fetchOrder();
     }
-  }, [id, order]);
-
-  const fetchOrder = async () => {
-    try {
-      setLoading(true);
-      const data = await getOrder(id);
-      setOrder(data);
-    } catch (err) {
-      console.error(err);
-      setOrder(null);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [id, order, fetchOrder]);
 
   if (loading) {
     return (

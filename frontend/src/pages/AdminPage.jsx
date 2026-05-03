@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getTimeDeals, createTimeDeal, updateTimeDeal, deleteTimeDeal, getCategories } from '../api/timedeal';
 import { getCurrentUser, logout } from '../api/auth';
@@ -55,18 +55,6 @@ const AdminPage = () => {
     fetchDeals();
     getCategories().then(setCategories).catch(() => {});
   }, [fetchDeals]);
-
-  const fetchDeals = async () => {
-    try {
-      setLoading(true);
-      const data = await getTimeDeals();
-      setDeals(data);
-    } catch (e) {
-      showToast('딜 목록을 불러오지 못했어요.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
