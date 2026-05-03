@@ -103,14 +103,21 @@ resource "aws_security_group" "rds_sg" {
     security_groups = [aws_security_group.api_gateway_sg.id, aws_security_group.internal_msa_sg.id]
   }
 
+<<<<<<< HEAD
   # EKS/Karpenter 노드 접근 허용
+=======
+>>>>>>> origin/feat/eks-migration
   ingress {
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
+<<<<<<< HEAD
     security_groups = [var.eks_node_sg_id]
+=======
+    security_groups = [var.eks_cluster_sg_id]
+>>>>>>> origin/feat/eks-migration
   }
-
+  
   egress {
     from_port   = 0
     to_port     = 0
@@ -136,12 +143,15 @@ resource "aws_security_group" "redis_sg" {
     security_groups = [aws_security_group.api_gateway_sg.id, aws_security_group.internal_msa_sg.id]
   }
 
-  # 추가 EKS 노드 접근 허용
   ingress {
     from_port       = 6379
     to_port         = 6379
     protocol        = "tcp"
+<<<<<<< HEAD
     security_groups = [var.eks_node_sg_id]
+=======
+    security_groups = [var.eks_cluster_sg_id]
+>>>>>>> origin/feat/eks-migration
   }
 
   egress {
