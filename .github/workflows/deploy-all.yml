@@ -97,7 +97,6 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: pposiraegi-${{ matrix.service }}
           IMAGE_TAG: ${{ github.sha }}
-        working-directory: ./backend
         run: |
           docker build --build-arg MODULE_NAME=${{ matrix.service }} -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
