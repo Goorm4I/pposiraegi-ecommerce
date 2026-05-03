@@ -51,6 +51,18 @@ const AdminPage = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
+  const fetchDeals = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await getTimeDeals();
+      setDeals(data);
+    } catch (e) {
+      showToast('딜 목록을 불러오지 못했어요.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchDeals();
     getCategories().then(setCategories).catch(() => {});

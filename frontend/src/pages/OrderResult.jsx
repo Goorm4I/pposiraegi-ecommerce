@@ -19,6 +19,19 @@ const OrderResult = () => {
   const t3 = fmt(baseRef.current + 800);
   const t4 = fmt(baseRef.current + 1200);
 
+  const fetchOrder = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await getOrder(id);
+      setOrder(data);
+    } catch (err) {
+      console.error(err);
+      setOrder(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     if (!order) {
       fetchOrder();
