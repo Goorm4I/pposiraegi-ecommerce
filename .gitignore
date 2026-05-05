@@ -8,6 +8,9 @@ AGENTS.local.md
 .env.*
 !.env.example
 .env.local
+*.secret
+*.secrets
+secrets/
 
 # OS / editor metadata
 .DS_Store

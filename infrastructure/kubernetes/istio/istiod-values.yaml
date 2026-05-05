@@ -10,6 +10,8 @@
 profile: ambient
 
 pilot:
+  nodeSelector:
+    karpenter.sh/capacity-type: on-demand
   resources:
     requests:
       cpu: 100m

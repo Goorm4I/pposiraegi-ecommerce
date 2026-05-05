@@ -1,0 +1,65 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pposiraegi-platform-alerts
+  namespace: monitoring
+  labels:
+    app: kube-prometheus-stack
+    release: kube-prometheus-stack
+spec:
+  groups:
+  - name: pposiraegi.platform
+    rules:
+    - alert: PposiraegiAppScrapeDown
+      expr: up{namespace="production", job="spring-boot-services"} == 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Spring Boot actuator scrape target is down"
+        description: "Prometheus cannot scrape {{ $labels.service }} /actuator/prometheus for more than 2 minutes."
+    - alert: PposiraegiOrderSubmitSlow
+      expr: |
+        (
+          sum(rate(http_server_requests_seconds_sum{namespace="production", service="order-service", uri=~".*/orders.*"}[5m]))
+          /
+          sum(rate(http_server_requests_seconds_count{namespace="production", service="order-service", uri=~".*/orders.*"}[5m]))
+        ) > 2
+      for: 3m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Order API average latency is over 2 seconds"
+        description: "Order service is still succeeding, but latency is above the 실습 SLO. Check Hikari pending and downstream gRPC calls."
+    - alert: PposiraegiHikariPendingConnections
+      expr: max(hikaricp_connections_pending{namespace="production", service="order-service"}) > 0
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Order service has pending DB connections"
+        description: "Hikari pending connections stayed above 0 for 2 minutes. DB pool or transaction scope may be the bottleneck."
+    - alert: PposiraegiMonitoringPVCUsageHigh
+      expr: |
+        (
+          kubelet_volume_stats_used_bytes{namespace="monitoring"}
+          /
+          kubelet_volume_stats_capacity_bytes{namespace="monitoring"}
+        ) > 0.8
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Monitoring PVC usage is above 80%"
+        description: "{{ $labels.persistentvolumeclaim }} in monitoring namespace is using more than 80% of its capacity."
+    - alert: PposiraegiPromtailNotReady
+      expr: |
+        kube_daemonset_status_number_ready{namespace="monitoring", daemonset="promtail"}
+        <
+        kube_daemonset_status_desired_number_scheduled{namespace="monitoring", daemonset="promtail"}
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Promtail daemonset is not fully ready"
+        description: "Promtail is not running on every scheduled node. Log coverage may have gaps."

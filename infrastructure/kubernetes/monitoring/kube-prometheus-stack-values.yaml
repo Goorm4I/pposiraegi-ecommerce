@@ -5,6 +5,8 @@
 
 grafana:
   enabled: true
+  nodeSelector:
+    eks.amazonaws.com/capacityType: ON_DEMAND
   adminPassword: ""  # 실제 배포 시 External Secrets로 주입
   deploymentStrategy:
     type: Recreate  # RWO PVC Multi-Attach 방지
@@ -55,6 +57,8 @@ grafana:
 
 prometheus:
   prometheusSpec:
+    nodeSelector:
+      eks.amazonaws.com/capacityType: ON_DEMAND
     retention: 7d
     storageSpec:
       volumeClaimTemplate:
@@ -67,6 +71,7 @@ prometheus:
     # pposiraegi 네임스페이스 ServiceMonitor 자동 감지
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
     additionalScrapeConfigs:
     - job_name: spring-boot-services
       # role: endpoints → Service 경유 스크래핑
@@ -81,6 +86,9 @@ prometheus:
       - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
         action: keep
         regex: "true"
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: management
       - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
         action: replace
         target_label: __metrics_path__
@@ -96,6 +104,8 @@ prometheus:
 alertmanager:
   enabled: true
   alertmanagerSpec:
+    nodeSelector:
+      eks.amazonaws.com/capacityType: ON_DEMAND
     storage:
       volumeClaimTemplate:
         spec:
@@ -105,34 +115,26 @@ alertmanager:
             requests:
               storage: 2Gi
   config:
-    global:
-      slack_api_url: ""  # 실제 배포 시 Secret으로 주입
     route:
       group_by: [alertname, namespace]
       group_wait: 30s
       group_interval: 5m
       repeat_interval: 4h
-      receiver: slack-notifications
+      receiver: discord-platform-alerts
       routes:
       - matchers:
         - alertname =~ "KarpenterNodeDisruption|KarpenterNodeTermination"
-        receiver: slack-karpenter
+        receiver: discord-platform-alerts
     receivers:
-    - name: slack-notifications
-      slack_configs:
-      - channel: "#pposiraegi-alerts"
-        title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
-        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
-    - name: slack-karpenter
-      slack_configs:
-      - channel: "#pposiraegi-infra"
-        title: '[Karpenter] {{ .CommonLabels.alertname }}'
-        text: 'Node disruption detected: {{ range .Alerts }}{{ .Labels.node }}{{ end }}'
+    - name: discord-platform-alerts
+      webhook_configs:
+      - url: http://discord-alert-relay.monitoring.svc.cluster.local:8080/alertmanager
+        send_resolved: true
 
 # Spring Boot /actuator/prometheus 스크래핑용 어노테이션 (deployment에 추가 필요)
 # metadata.annotations:
 #   prometheus.io/scrape: "true"
-#   prometheus.io/port: "8080"
+#   prometheus.io/port: "8081"
 #   prometheus.io/path: "/actuator/prometheus"
 
 nodeExporter:
@@ -140,3 +142,11 @@ nodeExporter:
 
 kubeStateMetrics:
   enabled: true
+
+prometheusOperator:
+  nodeSelector:
+    eks.amazonaws.com/capacityType: ON_DEMAND
+
+kube-state-metrics:
+  nodeSelector:
+    eks.amazonaws.com/capacityType: ON_DEMAND

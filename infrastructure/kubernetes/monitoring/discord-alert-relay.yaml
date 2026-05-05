@@ -1,0 +1,140 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: discord-alert-relay
+  namespace: monitoring
+data:
+  relay.py: |
+    import json
+    import os
+    import urllib.request
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "")
+
+    def fmt_alert(alert):
+      labels = alert.get("labels", {})
+      annotations = alert.get("annotations", {})
+      status = alert.get("status", "unknown").upper()
+      name = labels.get("alertname", "unknown-alert")
+      namespace = labels.get("namespace", "-")
+      severity = labels.get("severity", "warning")
+      summary = annotations.get("summary") or annotations.get("description") or "No summary"
+      return f"[{status}] {name} ({severity}, ns={namespace})\n{summary}"
+
+    class Handler(BaseHTTPRequestHandler):
+      def do_GET(self):
+        if self.path == "/healthz":
+          self.send_response(200)
+          self.end_headers()
+          self.wfile.write(b"ok")
+          return
+        self.send_response(404)
+        self.end_headers()
+
+      def do_POST(self):
+        if self.path != "/alertmanager":
+          self.send_response(404)
+          self.end_headers()
+          return
+        length = int(self.headers.get("content-length", "0"))
+        payload = json.loads(self.rfile.read(length) or b"{}")
+        alerts = payload.get("alerts", [])
+        lines = [fmt_alert(alert) for alert in alerts[:8]]
+        if len(alerts) > 8:
+          lines.append(f"...and {len(alerts) - 8} more alert(s)")
+        content = "\n\n".join(lines)[:1900] or "Alertmanager notification"
+        body = json.dumps({"content": content}).encode("utf-8")
+        req = urllib.request.Request(
+          WEBHOOK_URL,
+          data=body,
+          headers={"Content-Type": "application/json"},
+          method="POST",
+        )
+        try:
+          with urllib.request.urlopen(req, timeout=10) as res:
+            self.send_response(200 if res.status < 400 else 502)
+        except Exception as exc:
+          print(f"discord post failed: {exc}", flush=True)
+          self.send_response(502)
+        self.end_headers()
+
+      def log_message(self, fmt, *args):
+        return
+
+    if not WEBHOOK_URL:
+      raise SystemExit("DISCORD_WEBHOOK_URL is required")
+    HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discord-alert-relay
+  namespace: monitoring
+  labels:
+    app: discord-alert-relay
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: discord-alert-relay
+  template:
+    metadata:
+      labels:
+        app: discord-alert-relay
+    spec:
+      nodeSelector:
+        eks.amazonaws.com/capacityType: ON_DEMAND
+      containers:
+      - name: relay
+        image: public.ecr.aws/docker/library/python:3.12-alpine
+        command: ["python", "/app/relay.py"]
+        env:
+        - name: DISCORD_WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: discord-webhook
+              key: url
+        ports:
+        - name: http
+          containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        resources:
+          requests:
+            cpu: 20m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: app
+          mountPath: /app
+          readOnly: true
+      volumes:
+      - name: app
+        configMap:
+          name: discord-alert-relay
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: discord-alert-relay
+  namespace: monitoring
+spec:
+  selector:
+    app: discord-alert-relay
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http

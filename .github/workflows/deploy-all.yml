@@ -102,13 +102,6 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-      - name: Update kubeconfig
-        run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER }}
-
-      - name: Rollout restart (ArgoCD sync fallback)
-        run: |
-          kubectl rollout restart deployment/${{ matrix.service }} -n production
-
   frontend_deploy:
     name: Frontend Build & Deploy
     needs: terraform_apply

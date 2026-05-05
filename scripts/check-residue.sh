@@ -98,6 +98,15 @@ check_karpenter_residue() {
       --filters "Name=tag:karpenter.sh/discovery,Values=${CLUSTER_NAME}" \
       --query 'SecurityGroups[].{GroupId:GroupId,GroupName:GroupName,VpcId:VpcId,Discovery:Tags[?Key==`karpenter.sh/discovery`]|[0].Value}' \
       --output table
+
+  aws_read "Active Spot requests matching Karpenter/cluster instances" \
+    aws ec2 describe-spot-instance-requests \
+      --region "${AWS_REGION}" \
+      --filters \
+        "Name=state,Values=open,active" \
+        "Name=tag:karpenter.sh/nodepool,Values=*" \
+      --query 'SpotInstanceRequests[].{RequestId:SpotInstanceRequestId,State:State,Status:Status.Code,InstanceId:InstanceId,Type:Type,NodePool:Tags[?Key==`karpenter.sh/nodepool`]|[0].Value}' \
+      --output table
 }
 
 check_lbc_residue() {
