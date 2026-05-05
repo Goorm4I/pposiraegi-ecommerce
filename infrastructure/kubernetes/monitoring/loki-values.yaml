@@ -1,7 +1,9 @@
-## Loki (로그 수집) Helm values — Simple Scalable mode
+## Loki (로그 수집) Helm values — SingleBinary mode
 ## helm repo add grafana https://grafana.github.io/helm-charts
 ## helm upgrade --install loki grafana/loki \
 ##   -n monitoring -f loki-values.yaml
+
+deploymentMode: SingleBinary
 
 loki:
   auth_enabled: false
@@ -69,7 +71,7 @@ serviceAccount:
     eks.amazonaws.com/role-arn: "arn:aws:iam::${AWS_ACCOUNT_ID}:role/pposiraegi-loki-role"
 
 # 실습용 .large NodePool 기준: Loki 기본 memcached chunks-cache는 약 10Gi 메모리를 요구한다.
-# 비용 최적화 노드 정책과 충돌하므로 캐시 계층은 끄고, S3 + 단일 replica 구성부터 안정화한다.
+# 비용 최적화 노드 정책과 충돌하므로 캐시 계층은 끄고, S3 + SingleBinary부터 안정화한다.
 chunksCache:
   enabled: false
 
@@ -83,25 +85,27 @@ lokiCanary:
   enabled: false
 
 gateway:
+  nodeSelector:
+    karpenter.sh/capacity-type: on-demand
   nginxConfig:
     # 기본값은 kube-dns FQDN인데 nginx 시작 시점 DNS 조회 실패로 CrashLoop가 발생할 수 있다.
     # EKS 기본 Service CIDR 기준 kube-dns ClusterIP를 직접 사용한다.
     resolver: "172.20.0.10"
 
-write:
+singleBinary:
+  nodeSelector:
+    karpenter.sh/capacity-type: on-demand
   replicas: 1
   persistence:
+    enabled: true
     size: 10Gi
     storageClass: gp3
+
+write:
+  replicas: 0
 
 read:
-  replicas: 1
-  persistence:
-    size: 10Gi
-    storageClass: gp3
+  replicas: 0
 
 backend:
-  replicas: 1
-  persistence:
-    size: 10Gi
-    storageClass: gp3
+  replicas: 0
