@@ -126,6 +126,45 @@ Karpenter controller 로그 확인
 EC2 termination 수동 확인
 ```
 
+### Karpenter Spot Request
+
+조회 기준:
+
+```text
+state: open, active
+tag: karpenter.sh/nodepool
+```
+
+의미:
+
+```text
+Karpenter가 Spot 노드를 만들며 생성한 Spot Instance Request.
+EC2 인스턴스를 직접 종료해도 Spot Request가 잠시 active/fulfilled로 남을 수 있다.
+이 상태에서는 AWSServiceRoleForEC2Spot 삭제가 실패할 수 있다.
+```
+
+이번 실습에서 실제로 발생한 흐름:
+
+```text
+terraform destroy
+  -> EKS cluster 삭제
+  -> Karpenter controller 사라짐
+  -> Karpenter Spot EC2 2대가 ENI/SG를 붙잡음
+  -> EC2 직접 terminate
+  -> Spot Request 2개가 active/fulfilled로 남음
+  -> AWSServiceRoleForEC2Spot 삭제 실패
+  -> Spot Request cancel 후 terraform destroy 재실행 성공
+```
+
+반복 발생 시:
+
+```text
+destroy 전 kubectl delete nodeclaim --all 검토
+EC2가 남으면 tag:karpenter.sh/nodepool 기준으로만 종료
+Spot Request가 active면 해당 request만 cancel
+cleanup 자동화는 dry-run + --yes 방식으로 별도 분리
+```
+
 ### LBC ALB / TargetGroup
 
 조회 기준:
@@ -171,6 +210,28 @@ Prometheus/Grafana/AlertManager PVC에서 생길 수 있다.
 PVC reclaimPolicy 확인
 EBS CSI controller 상태 확인
 destroy 전 monitoring uninstall 여부 검토
+```
+
+이번 실습에서 실제로 발생한 흐름:
+
+```text
+kube-prometheus-stack / Loki 설치
+  -> monitoring PVC 생성
+  -> EBS CSI가 gp3 volume 생성
+terraform destroy
+  -> EKS cluster 삭제
+  -> PVC 삭제 이벤트를 처리할 controller도 사라짐
+  -> EBS volume이 available 상태로 잔류
+  -> 비용 발생 가능
+  -> tag:kubernetes.io/created-for/pvc/name 기준으로 확인 후 수동 삭제
+```
+
+destroy/apply 반복 기간의 임시 기준:
+
+```text
+Prometheus/Grafana/Loki PVC 데이터는 보존 대상이 아니다.
+destroy 후 available EBS volume이 남으면 삭제한다.
+단, 삭제 전 반드시 PVC tag와 상태 available을 확인한다.
 ```
 
 ### EKS Access Entry

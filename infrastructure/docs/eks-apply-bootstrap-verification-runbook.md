@@ -318,9 +318,15 @@ kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
 Loki 확인:
 
 ```bash
+kubectl get statefulset loki -n monitoring
+kubectl get deployment loki-gateway -n monitoring
 kubectl logs -n monitoring -l app.kubernetes.io/name=loki --tail=100
 kubectl logs -n monitoring -l app.kubernetes.io/name=promtail --tail=100
 ```
+
+현재 Loki는 실습 비용을 줄이기 위해 SingleBinary mode를 사용한다.
+정상 상태는 `loki` StatefulSet 1개와 `loki-gateway` Deployment 1개다.
+`loki-read`, `loki-write`, `loki-backend`가 다시 생기면 Simple Scalable mode로 돌아간 것이다.
 
 ### 공부 포인트
 
