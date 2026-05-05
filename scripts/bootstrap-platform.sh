@@ -15,6 +15,8 @@
 #   ./scripts/bootstrap-platform.sh --from=lbc            # 동일 (= 형태도 지원)
 #   ./scripts/bootstrap-platform.sh --only monitoring     # monitoring만 실행
 #   ./scripts/bootstrap-platform.sh --only=monitoring     # 동일
+#   DISCORD_WEBHOOK_URL=... ./scripts/bootstrap-platform.sh --only monitoring
+#   DISCORD_WEBHOOK_SSM_PARAM=/pposiraegi/discord/webhook-url ./scripts/bootstrap-platform.sh
 #
 # 단계 이름: metrics-server | argocd | karpenter | lbc | istio | storage | monitoring | eso | argocd-sync
 
@@ -45,6 +47,12 @@ KARPENTER_ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/pposiraegi-karpenter-con
 LBC_ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/pposiraegi-aws-load-balancer-controller"
 ESO_ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/pposiraegi-external-secrets-operator"
 LOKI_ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/pposiraegi-loki-role"
+DISCORD_WEBHOOK_SSM_PARAM="${DISCORD_WEBHOOK_SSM_PARAM:-/pposiraegi/discord/webhook-url}"
+
+# Bootstrap 순서상 Karpenter 설치 전 컴포넌트는 managed node group의 On-Demand label을 사용한다.
+# Karpenter 설치 후 컴포넌트는 Karpenter의 on-demand capacity label을 사용해 pod slot 부족 시 증설 가능하게 한다.
+ON_DEMAND_NODE_SELECTOR="eks\.amazonaws\.com/capacityType=ON_DEMAND"
+KARPENTER_ON_DEMAND_NODE_SELECTOR="karpenter\.sh/capacity-type=on-demand"
 
 ###############################################################
 # 공통 유틸
@@ -55,6 +63,28 @@ log()  { echo -e "${CYAN}[$(date '+%H:%M:%S')]${NC} $*"; }
 ok()   { echo -e "${GREEN}[OK]${NC} $*"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 die()  { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
+
+discord_notify() {
+  local message="$1"
+  [[ -z "${DISCORD_WEBHOOK_URL:-}" ]] && return 0
+  "${REPO_ROOT}/scripts/notify-discord.sh" "${message}" 2>/dev/null || \
+    warn "Discord 알림 전송 실패 또는 DISCORD_WEBHOOK_URL 미설정"
+}
+
+load_discord_webhook() {
+  [[ -n "${DISCORD_WEBHOOK_URL:-}" ]] && return 0
+
+  log "Discord webhook SSM Parameter 조회: ${DISCORD_WEBHOOK_SSM_PARAM}"
+  DISCORD_WEBHOOK_URL="$(
+    aws ssm get-parameter \
+      --region "${AWS_REGION}" \
+      --name "${DISCORD_WEBHOOK_SSM_PARAM}" \
+      --with-decryption \
+      --query Parameter.Value \
+      --output text 2>/dev/null || true
+  )"
+  export DISCORD_WEBHOOK_URL
+}
 
 wait_rollout() {
   local ns="$1" deploy="$2"
@@ -114,6 +144,7 @@ install_metrics_server() {
     --namespace kube-system \
     --version "${METRICS_SERVER_VERSION}" \
     --set args="{--kubelet-insecure-tls}" \
+    --set "nodeSelector.${ON_DEMAND_NODE_SELECTOR}" \
     --wait --timeout 3m
     # EKS kubelet은 자체 서명 인증서를 사용하므로 TLS 검증 비활성화 필요
     # 외부 노출 없이 클러스터 내부 통신만 하므로 실습 환경에서 허용
@@ -137,6 +168,12 @@ install_argocd() {
     --set server.service.type=ClusterIP \
     --set applicationSet.enabled=false \
     --set configs.params."server\.insecure"=true \
+    --set "global.nodeSelector.${ON_DEMAND_NODE_SELECTOR}" \
+    --set "controller.nodeSelector.${ON_DEMAND_NODE_SELECTOR}" \
+    --set "server.nodeSelector.${ON_DEMAND_NODE_SELECTOR}" \
+    --set "repoServer.nodeSelector.${ON_DEMAND_NODE_SELECTOR}" \
+    --set "redis.nodeSelector.${ON_DEMAND_NODE_SELECTOR}" \
+    --set "notifications.nodeSelector.${ON_DEMAND_NODE_SELECTOR}" \
     --wait --timeout 5m
     # server.insecure=true: TLS 종료를 ALB/Ingress에 위임하는 구조 (내부 ClusterIP 전용)
     # 외부 직접 노출 시 반드시 false로 변경
@@ -171,6 +208,7 @@ install_karpenter() {
     --set controller.resources.requests.memory=256Mi \
     --set controller.resources.limits.cpu=1 \
     --set controller.resources.limits.memory=1Gi \
+    --set "nodeSelector.${ON_DEMAND_NODE_SELECTOR}" \
     --wait --timeout 5m
 
   wait_rollout karpenter karpenter
@@ -202,6 +240,7 @@ install_lbc() {
     --set vpcId="${vpc_id}" \
     --set "serviceAccount.annotations.eks\.amazonaws\.com/role-arn=${LBC_ROLE_ARN}" \
     --set replicaCount=2 \
+    --set "nodeSelector.${KARPENTER_ON_DEMAND_NODE_SELECTOR}" \
     --wait --timeout 5m
 
   wait_rollout kube-system aws-load-balancer-controller
@@ -294,11 +333,22 @@ install_storage() {
 ###############################################################
 install_monitoring() {
   log "=== 7. kube-prometheus-stack + Loki 설치 ==="
+  load_discord_webhook
   helm_repo_add prometheus-community https://prometheus-community.github.io/helm-charts
   helm_repo_add grafana https://grafana.github.io/helm-charts
   helm repo update prometheus-community grafana
 
   kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+
+  if [[ -n "${DISCORD_WEBHOOK_URL:-}" ]]; then
+    log "  Discord webhook Secret 적용"
+    kubectl create secret generic discord-webhook \
+      --namespace monitoring \
+      --from-literal=url="${DISCORD_WEBHOOK_URL}" \
+      --dry-run=client -o yaml | kubectl apply -f -
+  else
+    warn "DISCORD_WEBHOOK_URL 미설정 — Alertmanager Discord 전송은 비활성 상태로 배포됨"
+  fi
 
   log "  7-1. kube-prometheus-stack"
   helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
@@ -307,7 +357,16 @@ install_monitoring() {
     -f "${K8S_DIR}/monitoring/kube-prometheus-stack-values.yaml" \
     --wait --timeout 10m
 
-  log "  7-2. Loki (S3 IRSA annotation 포함)"
+  log "  7-2. Discord Alert Relay / PrometheusRule"
+  if kubectl get secret discord-webhook -n monitoring >/dev/null 2>&1; then
+    kubectl apply -f "${K8S_DIR}/monitoring/discord-alert-relay.yaml"
+    wait_rollout monitoring discord-alert-relay
+  else
+    warn "discord-webhook Secret 없음 — discord-alert-relay 배포 생략"
+  fi
+  kubectl apply -f "${K8S_DIR}/monitoring/pposiraegi-prometheus-rules.yaml"
+
+  log "  7-3. Loki (S3 IRSA annotation 포함)"
   # loki-values.yaml의 ${AWS_ACCOUNT_ID} 플레이스홀더를 실제 값으로 치환
   local loki_values
   loki_values="$(sed "s|\${AWS_ACCOUNT_ID}|${AWS_ACCOUNT_ID}|g" \
@@ -321,6 +380,7 @@ install_monitoring() {
     --wait --timeout 10m
 
   ok "모니터링 스택 완료"
+  discord_notify "pposiraegi bootstrap: monitoring stack is ready (${CLUSTER_NAME}/${AWS_REGION})"
 }
 
 ###############################################################
@@ -338,6 +398,9 @@ install_eso() {
     --version "${ESO_VERSION}" \
     --set installCRDs=true \
     --set "serviceAccount.annotations.eks\.amazonaws\.com/role-arn=${ESO_ROLE_ARN}" \
+    --set "nodeSelector.${KARPENTER_ON_DEMAND_NODE_SELECTOR}" \
+    --set "webhook.nodeSelector.${KARPENTER_ON_DEMAND_NODE_SELECTOR}" \
+    --set "certController.nodeSelector.${KARPENTER_ON_DEMAND_NODE_SELECTOR}" \
     --wait --timeout 5m
 
   wait_crd "externalsecrets.external-secrets.io"
@@ -413,6 +476,8 @@ print_summary() {
   echo "    ArgoCD:   kubectl port-forward svc/argocd-server 8080:80 -n argocd"
   echo "    Karpenter: kubectl get nodepools,ec2nodeclasses"
   echo ""
+
+  "${REPO_ROOT}/scripts/cluster-summary.sh" --notify 2>/dev/null || true
 }
 
 ###############################################################
