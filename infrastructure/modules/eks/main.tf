@@ -33,7 +33,12 @@ resource "aws_eks_access_entry" "cluster_admins" {
   cluster_name  = aws_eks_cluster.main.name
   principal_arn = each.value
   type          = "STANDARD"
+  
+  lifecycle {
+    ignore_changes = [type]
+  }
 }
+
 
 resource "aws_eks_access_policy_association" "cluster_admins" {
   for_each = aws_eks_access_entry.cluster_admins
