@@ -2,6 +2,11 @@ name: Deploy All (Infrastructure & Apps)
 
 on:
   workflow_dispatch:
+    inputs:
+      skip_bootstrap:
+        description: '부트스트랩 스킵 (이미 설치된 경우)'
+        type: boolean
+        default: true
   push:
     branches: [ "main" ]
 
@@ -41,7 +46,7 @@ jobs:
 
       - name: Create terraform.tfvars
         run: |
-          cat > terraform.tfvars <<EOF
+          cat > terraform.tfvars <<TFEOF
           aws_profile           = ""
           region                = "ap-northeast-2"
           project_name          = "pposiraegi"
@@ -57,7 +62,7 @@ jobs:
           github_repo           = "Goorm4I/pposiraegi-ecommerce-msa"
           github_branch         = "main"
           codestar_connection_arn = "arn:aws:codeconnections:ap-northeast-2:779846782353:connection/f2153b0a-6274-4ffa-b82c-f90f2cf52c0d"
-          EOF
+          TFEOF
 
       - name: Delete existing EKS Access Entries
         run: |
@@ -79,6 +84,7 @@ jobs:
   bootstrap:
     name: Bootstrap Platform
     needs: terraform_apply
+    if: ${{ inputs.skip_bootstrap == false }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -108,7 +114,8 @@ jobs:
 
   backend_deploy:
     name: Backend Build & Push
-    needs: bootstrap
+    needs: [terraform_apply, bootstrap]
+    if: ${{ always() && needs.terraform_apply.result == 'success' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
