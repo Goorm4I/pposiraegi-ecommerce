@@ -130,7 +130,6 @@ variable "eks_admin_principal_arns" {
   description = "EKS cluster admin access entries for team operators"
   type        = list(string)
   default = [
-    "arn:aws:iam::779846782353:user/jihoon",
     "arn:aws:iam::779846782353:user/nahyung",
   ]
 }
