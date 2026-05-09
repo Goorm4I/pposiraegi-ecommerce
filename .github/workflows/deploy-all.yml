@@ -59,6 +59,13 @@ jobs:
           codestar_connection_arn = "arn:aws:codeconnections:ap-northeast-2:779846782353:connection/f2153b0a-6274-4ffa-b82c-f90f2cf52c0d"
           EOF
 
+      - name: Delete existing EKS Access Entries
+        run: |
+          aws eks delete-access-entry \
+            --cluster-name ${{ env.EKS_CLUSTER }} \
+            --principal-arn arn:aws:iam::779846782353:user/jihoon \
+            --region ${{ env.AWS_REGION }} || true
+
       - name: Terraform Apply
         run: terraform apply -auto-approve
 
