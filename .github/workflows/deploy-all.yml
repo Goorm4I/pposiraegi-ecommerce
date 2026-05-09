@@ -69,9 +69,39 @@ jobs:
           echo "s3_bucket=$(jq -r '.s3_bucket_name.value' tf_out.json)" >> $GITHUB_OUTPUT
           echo "cloudfront_id=$(jq -r '.cloudfront_id.value' tf_out.json)" >> $GITHUB_OUTPUT
 
+  bootstrap:
+    name: Bootstrap Platform
+    needs: terraform_apply
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+
+      - name: Configure kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER }}
+
+      - name: Run bootstrap script
+        run: |
+          chmod +x ./scripts/bootstrap-platform.sh
+          ./scripts/bootstrap-platform.sh
+
   backend_deploy:
     name: Backend Build & Push
-    needs: terraform_apply
+    needs: bootstrap
     runs-on: ubuntu-latest
     strategy:
       matrix:
