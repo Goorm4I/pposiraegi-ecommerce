@@ -14,7 +14,7 @@ variable "region" {
 
 variable "github_repo" {
   description = "Backend GitHub repository name (format: owner/repo)"
-  default     = "Goorm4I/pposiraegi-ecommerce-msa"
+  default     = "Goorm4I/pposiraegi-ecommerce"
 }
 
 variable "frontend_github_repo" {

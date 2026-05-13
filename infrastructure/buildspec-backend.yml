@@ -21,6 +21,4 @@ phases:
       - echo Pushing the Docker images...
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo Updating ECS service $ECS_SERVICE in cluster $ECS_CLUSTER...
-      - aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment
-      - echo Deployment triggered!
+      - echo Image pushed. ArgoCD manages Kubernetes manifests; rollout is triggered separately.
