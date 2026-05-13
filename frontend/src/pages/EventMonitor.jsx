@@ -404,6 +404,7 @@ const OverviewTab = ({ onCopy, resourceSummary, resourceError }) => (
 const ResourceSummary = ({ summary, error }) => {
   const cluster = summary?.cluster;
   const nodes = summary?.nodes || [];
+  const services = summary?.services || [];
   const updatedAt = summary?.timestamp
     ? new Date(summary.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : '-';
@@ -444,7 +445,54 @@ const ResourceSummary = ({ summary, error }) => {
           ))}
         </div>
       </div>
+
+      <div className="mt-5 border-t border-slate-100 pt-4">
+        <div className="flex flex-col gap-1 md:flex-row md:items-end md:justify-between mb-3">
+          <div>
+            <h3 className="font-black text-slate-900">서비스별 CPU / Memory</h3>
+            <p className="text-sm text-slate-500">production Pod 지표를 서비스 단위로 묶어 어떤 서비스가 리소스를 쓰는지 봅니다.</p>
+          </div>
+          <span className="text-xs font-bold text-slate-400">CPU는 mCPU, Memory는 MiB 기준</span>
+        </div>
+        <ServiceResourceList services={services} error={error} />
+      </div>
     </section>
+  );
+};
+
+const ServiceResourceList = ({ services, error }) => {
+  if (!services.length) {
+    return (
+      <div className="rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+        {error || '서비스별 리소스 지표를 기다리는 중입니다.'}
+      </div>
+    );
+  }
+
+  const maxCpu = Math.max(...services.map(service => service.cpuMilliCores), 1);
+  const maxMemory = Math.max(...services.map(service => service.memoryMiB), 1);
+
+  return (
+    <div className="grid lg:grid-cols-2 gap-3">
+      {services.map(service => (
+        <div key={service.service} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <div className="text-sm font-black text-slate-900">{service.service}</div>
+              <div className="text-xs font-bold text-slate-400">{service.podCount} pods</div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm font-black text-blue-700">{service.cpuMilliCores.toFixed(1)} mCPU</div>
+              <div className="text-xs font-bold text-amber-700">{service.memoryMiB.toFixed(1)} MiB</div>
+            </div>
+          </div>
+          <RelativeBar label="CPU" value={service.cpuMilliCores} max={maxCpu} tone="blue" />
+          <div className="mt-2">
+            <RelativeBar label="MEM" value={service.memoryMiB} max={maxMemory} tone="amber" />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 };
 
@@ -478,6 +526,23 @@ const UsageBar = ({ label, value, tone }) => {
       </div>
       <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${safeValue}%` }} />
+      </div>
+    </div>
+  );
+};
+
+const RelativeBar = ({ label, value, max, tone }) => {
+  const percent = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
+  const color = tone === 'blue' ? 'bg-blue-500' : 'bg-amber-500';
+
+  return (
+    <div>
+      <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
+        <span>{label}</span>
+        <span>{percent.toFixed(0)}% of top</span>
+      </div>
+      <div className="h-2 rounded-full bg-white overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${percent}%` }} />
       </div>
     </div>
   );
