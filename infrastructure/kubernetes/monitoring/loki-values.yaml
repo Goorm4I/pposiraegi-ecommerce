@@ -29,42 +29,6 @@ loki:
         prefix: loki_index_
         period: 24h
 
-# Promtail (각 노드에서 Pod 로그 수집)
-promtail:
-  enabled: true
-  config:
-    clients:
-    - url: http://loki:3100/loki/api/v1/push
-    snippets:
-      pipelineStages:
-      - docker: {}
-      # Spring Boot JSON 로그 파싱
-      - json:
-          expressions:
-            level: level
-            logger: logger_name
-            message: message
-            trace_id: mdc.traceId
-      - labels:
-          level:
-          logger:
-      - output:
-          source: message
-    scrapeConfigs:
-    - job_name: kubernetes-pods
-      kubernetes_sd_configs:
-      - role: pod
-      relabel_configs:
-      - source_labels: [__meta_kubernetes_namespace]
-        action: keep
-        regex: production|monitoring
-      - source_labels: [__meta_kubernetes_pod_label_app]
-        target_label: app
-      - source_labels: [__meta_kubernetes_namespace]
-        target_label: namespace
-      - source_labels: [__meta_kubernetes_pod_name]
-        target_label: pod
-
 # S3 접근용 IRSA (Terraform에서 role 생성 후 annotation 추가)
 serviceAccount:
   annotations:

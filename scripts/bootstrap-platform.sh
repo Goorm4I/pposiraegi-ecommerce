@@ -41,6 +41,7 @@ LBC_VERSION="1.11.0"
 ISTIO_VERSION="1.25.1"
 PROM_STACK_VERSION="67.9.0"
 LOKI_VERSION="6.29.0"
+PROMTAIL_VERSION="6.16.6"
 ESO_VERSION="0.14.0"
 FRONTEND_PIPELINE_NAME="${FRONTEND_PIPELINE_NAME:-pposiraegi-frontend-pipeline}"
 
@@ -381,6 +382,13 @@ install_monitoring() {
     --set "serviceAccount.annotations.eks\.amazonaws\.com/role-arn=${LOKI_ROLE_ARN}" \
     --wait --timeout 10m
 
+  log "  7-4. Promtail (Pod 로그 수집 DaemonSet)"
+  helm upgrade --install promtail grafana/promtail \
+    --namespace monitoring \
+    --version "${PROMTAIL_VERSION}" \
+    -f "${K8S_DIR}/monitoring/promtail-values.yaml" \
+    --wait --timeout 5m
+
   ok "모니터링 스택 완료"
   discord_notify "pposiraegi bootstrap: monitoring stack is ready (${CLUSTER_NAME}/${AWS_REGION})"
 }
@@ -503,6 +511,7 @@ print_summary() {
   printf "    %-30s %s\n" "Istio Ambient"         "${ISTIO_VERSION}"
   printf "    %-30s %s\n" "kube-prometheus-stack" "${PROM_STACK_VERSION}"
   printf "    %-30s %s\n" "Loki"                  "${LOKI_VERSION}"
+  printf "    %-30s %s\n" "Promtail"              "${PROMTAIL_VERSION}"
   printf "    %-30s %s\n" "Frontend Pipeline"     "${FRONTEND_PIPELINE_NAME}"
   printf "    %-30s %s\n" "ESO"                   "${ESO_VERSION}"
   echo ""

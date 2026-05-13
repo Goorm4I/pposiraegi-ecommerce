@@ -1,0 +1,49 @@
+## Promtail — 각 노드의 Pod 로그를 Loki로 push
+## helm upgrade --install promtail grafana/promtail \
+##   -n monitoring -f promtail-values.yaml
+
+config:
+  clients:
+    - url: http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push
+  snippets:
+    pipelineStages:
+      - cri: {}
+    extraRelabelConfigs:
+      - source_labels:
+          - __meta_kubernetes_namespace
+        action: keep
+        regex: production|monitoring
+      - source_labels:
+          - __meta_kubernetes_namespace
+        target_label: namespace
+      - source_labels:
+          - __meta_kubernetes_pod_name
+        target_label: pod
+      - source_labels:
+          - __meta_kubernetes_pod_container_name
+        target_label: container
+      - source_labels:
+          - __meta_kubernetes_pod_label_app
+        target_label: app
+
+tolerations:
+  - operator: Exists
+    effect: NoSchedule
+  - operator: Exists
+    effect: NoExecute
+
+# 현재 managed node(t3.medium)는 pod slot이 빠듯해서 DaemonSet이 전체 노드에 붙으면
+# Helm --wait가 실패한다. 우선 애플리케이션 로그 수집을 목표로 app 노드에만 배치한다.
+# system/managed node 로그까지 수집하려면 managed node group 용량 또는 maxPods 설계를 키운다.
+nodeSelector:
+  node-role: app
+
+affinity: {}
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
