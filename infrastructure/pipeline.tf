@@ -149,7 +149,7 @@ resource "aws_codepipeline" "backend" {
       output_artifacts = ["source_output"]
       configuration = {
         ConnectionArn    = var.codestar_connection_arn
-        FullRepositoryId = var.github_repo
+        FullRepositoryId = var.frontend_github_repo
         BranchName       = var.github_branch
       }
     }

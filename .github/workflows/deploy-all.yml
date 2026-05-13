@@ -60,6 +60,7 @@ jobs:
           db_password           = "${{ secrets.DB_PASSWORD }}"
           jwt_secret            = "${{ secrets.JWT_SECRET }}"
           github_repo           = "Goorm4I/pposiraegi-ecommerce-msa"
+          frontend_github_repo  = "Goorm4I/pposiraegi-ecommerce"
           github_branch         = "main"
           codestar_connection_arn = "arn:aws:codeconnections:ap-northeast-2:779846782353:connection/f2153b0a-6274-4ffa-b82c-f90f2cf52c0d"
           TFEOF

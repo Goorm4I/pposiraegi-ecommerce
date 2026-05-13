@@ -13,8 +13,13 @@ variable "region" {
 }
 
 variable "github_repo" {
-  description = "GitHub repository name (format: owner/repo)"
+  description = "Backend GitHub repository name (format: owner/repo)"
   default     = "Goorm4I/pposiraegi-ecommerce-msa"
+}
+
+variable "frontend_github_repo" {
+  description = "Frontend/infra GitHub repository name (format: owner/repo)"
+  default     = "Goorm4I/pposiraegi-ecommerce"
 }
 
 variable "github_branch" {
