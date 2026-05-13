@@ -27,9 +27,13 @@ public class MonitoringController {
     private static final String NODE_MEMORY_QUERY =
             "100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))";
     private static final String POD_CPU_QUERY =
-            "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"production\", container!=\"\", image!=\"\"}[2m]))";
+            "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"production\", container!=\"\", image!=\"\"}[2m])) "
+                    + "* on (pod) group_left() max by (pod) "
+                    + "(kube_pod_status_phase{namespace=\"production\", phase=\"Running\"} == 1)";
     private static final String POD_MEMORY_QUERY =
-            "sum by (pod) (container_memory_working_set_bytes{namespace=\"production\", container!=\"\", image!=\"\"})";
+            "sum by (pod) (container_memory_working_set_bytes{namespace=\"production\", container!=\"\", image!=\"\"}) "
+                    + "* on (pod) group_left() max by (pod) "
+                    + "(kube_pod_status_phase{namespace=\"production\", phase=\"Running\"} == 1)";
     private static final List<String> PRODUCTION_SERVICES = List.of(
             "api-gateway",
             "order-service",
