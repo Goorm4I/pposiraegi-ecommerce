@@ -84,7 +84,7 @@ spec:
         app: discord-alert-relay
     spec:
       nodeSelector:
-        eks.amazonaws.com/capacityType: ON_DEMAND
+        karpenter.sh/capacity-type: on-demand
       containers:
       - name: relay
         image: public.ecr.aws/docker/library/python:3.12-alpine

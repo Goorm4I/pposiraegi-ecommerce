@@ -51,8 +51,8 @@ ESO_ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/pposiraegi-external-secrets-op
 LOKI_ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/pposiraegi-loki-role"
 DISCORD_WEBHOOK_SSM_PARAM="${DISCORD_WEBHOOK_SSM_PARAM:-/pposiraegi/discord/webhook-url}"
 
-# Bootstrap 순서상 Karpenter 설치 전 컴포넌트는 managed node group의 On-Demand label을 사용한다.
-# Karpenter 설치 후 컴포넌트는 Karpenter의 on-demand capacity label을 사용해 pod slot 부족 시 증설 가능하게 한다.
+# Bootstrap 초반 핵심 컨트롤러는 Terraform managed node group에 고정한다.
+# Monitoring 이후 설치되는 보조 컨트롤러는 Karpenter On-Demand로 빼서 managed node pod slot 병목을 피한다.
 ON_DEMAND_NODE_SELECTOR="eks\.amazonaws\.com/capacityType=ON_DEMAND"
 KARPENTER_ON_DEMAND_NODE_SELECTOR="karpenter\.sh/capacity-type=on-demand"
 
@@ -242,7 +242,7 @@ install_lbc() {
     --set vpcId="${vpc_id}" \
     --set "serviceAccount.annotations.eks\.amazonaws\.com/role-arn=${LBC_ROLE_ARN}" \
     --set replicaCount=2 \
-    --set "nodeSelector.${KARPENTER_ON_DEMAND_NODE_SELECTOR}" \
+    --set "nodeSelector.${ON_DEMAND_NODE_SELECTOR}" \
     --wait --timeout 5m
 
   wait_rollout kube-system aws-load-balancer-controller

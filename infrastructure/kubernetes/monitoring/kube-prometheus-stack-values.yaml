@@ -111,7 +111,7 @@ alertmanager:
   enabled: true
   alertmanagerSpec:
     nodeSelector:
-      eks.amazonaws.com/capacityType: ON_DEMAND
+      karpenter.sh/capacity-type: on-demand
     storage:
       volumeClaimTemplate:
         spec:
