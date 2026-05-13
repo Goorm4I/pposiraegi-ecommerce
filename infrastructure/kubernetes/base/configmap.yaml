@@ -13,3 +13,4 @@ data:
   MANAGEMENT_SERVER_PORT: "8081"
   MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,prometheus"
   MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+  PROMETHEUS_BASE_URL: "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090"

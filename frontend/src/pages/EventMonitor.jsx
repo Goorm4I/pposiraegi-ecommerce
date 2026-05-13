@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { USE_MOCK } from '../api/config';
+import { API_BASE_URL, USE_MOCK } from '../api/config';
 import { eventWebSocket } from '../api/websocket';
 import { EVENT_TYPES } from '../mocks/events';
 import EventLog from '../components/EventLog';
@@ -196,6 +196,8 @@ const EventMonitor = () => {
   const [stats, setStats] = useState({ total: 0, success: 0, failed: 0 });
   const [filter, setFilter] = useState('ALL');
   const [isConnected, setIsConnected] = useState(false);
+  const [resourceSummary, setResourceSummary] = useState(null);
+  const [resourceError, setResourceError] = useState('');
   const [copied, setCopied] = useState('');
 
   useEffect(() => {
@@ -215,6 +217,35 @@ const EventMonitor = () => {
     return () => {
       unsubscribe();
       eventWebSocket.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSummary = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/monitoring/summary`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const body = await response.json();
+        if (!cancelled) {
+          setResourceSummary(body.data);
+          setResourceError(body.data?.error || '');
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setResourceError(error.message || '요약 지표를 불러오지 못했습니다.');
+        }
+      }
+    };
+
+    loadSummary();
+    const timer = setInterval(loadSummary, 10000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
     };
   }, []);
 
@@ -290,7 +321,13 @@ const EventMonitor = () => {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {activeTab === 'overview' && <OverviewTab onCopy={handleCopy} />}
+        {activeTab === 'overview' && (
+          <OverviewTab
+            onCopy={handleCopy}
+            resourceSummary={resourceSummary}
+            resourceError={resourceError}
+          />
+        )}
         {activeTab === 'metrics' && <MetricsTab onCopy={handleCopy} />}
         {activeTab === 'logs' && <LogsTab onCopy={handleCopy} />}
         {activeTab === 'runbook' && <RunbookTab onCopy={handleCopy} />}
@@ -307,7 +344,7 @@ const EventMonitor = () => {
   );
 };
 
-const OverviewTab = ({ onCopy }) => (
+const OverviewTab = ({ onCopy, resourceSummary, resourceError }) => (
   <div className="space-y-6">
     <section className="grid lg:grid-cols-[1.35fr_.65fr] gap-4">
       <div className="bg-slate-950 text-white rounded-xl p-6">
@@ -329,6 +366,8 @@ const OverviewTab = ({ onCopy }) => (
         </div>
       </div>
     </section>
+
+    <ResourceSummary summary={resourceSummary} error={resourceError} />
 
     <section className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
       {operatingSignals.map(signal => (
@@ -361,6 +400,88 @@ const OverviewTab = ({ onCopy }) => (
     </section>
   </div>
 );
+
+const ResourceSummary = ({ summary, error }) => {
+  const cluster = summary?.cluster;
+  const nodes = summary?.nodes || [];
+  const updatedAt = summary?.timestamp
+    ? new Date(summary.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : '-';
+
+  return (
+    <section className="bg-white rounded-xl border border-slate-200 p-5">
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between mb-4">
+        <div>
+          <h2 className="font-black text-slate-900">클러스터 리소스 실시간 요약</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Prometheus에서 node-exporter 지표를 읽어 10초마다 갱신합니다.
+          </p>
+        </div>
+        <StateBadge
+          label={summary?.available ? `Updated ${updatedAt}` : error ? 'Prometheus check' : 'Loading'}
+          tone={summary?.available ? 'green' : error ? 'amber' : 'gray'}
+        />
+      </div>
+
+      <div className="grid lg:grid-cols-[.9fr_1.1fr] gap-4">
+        <div className="grid grid-cols-3 gap-3">
+          <MetricTile label="Node" value={cluster?.nodeCount ?? '-'} suffix="대" />
+          <MetricTile label="CPU avg" value={cluster ? cluster.cpuPercent : '-'} suffix="%" tone="blue" />
+          <MetricTile label="Memory avg" value={cluster ? cluster.memoryPercent : '-'} suffix="%" tone="amber" />
+        </div>
+
+        <div className="space-y-2">
+          {nodes.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+              {error || 'Prometheus 요약 지표를 기다리는 중입니다.'}
+            </div>
+          ) : nodes.map(node => (
+            <div key={node.instance} className="grid md:grid-cols-[160px_1fr_1fr] gap-2 items-center text-sm">
+              <div className="font-bold text-slate-600 truncate">{node.instance}</div>
+              <UsageBar label="CPU" value={node.cpuPercent} tone="blue" />
+              <UsageBar label="MEM" value={node.memoryPercent} tone="amber" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const MetricTile = ({ label, value, suffix, tone = 'slate' }) => {
+  const toneClass = tone === 'blue'
+    ? 'bg-blue-50 text-blue-700 border-blue-100'
+    : tone === 'amber'
+      ? 'bg-amber-50 text-amber-700 border-amber-100'
+      : 'bg-slate-50 text-slate-700 border-slate-200';
+
+  return (
+    <div className={`rounded-lg border p-4 ${toneClass}`}>
+      <div className="text-xs font-black opacity-70">{label}</div>
+      <div className="text-2xl font-black mt-1">
+        {value}
+        <span className="text-sm ml-1">{value === '-' ? '' : suffix}</span>
+      </div>
+    </div>
+  );
+};
+
+const UsageBar = ({ label, value, tone }) => {
+  const safeValue = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+  const color = tone === 'blue' ? 'bg-blue-500' : 'bg-amber-500';
+
+  return (
+    <div>
+      <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
+        <span>{label}</span>
+        <span>{safeValue.toFixed(1)}%</span>
+      </div>
+      <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${safeValue}%` }} />
+      </div>
+    </div>
+  );
+};
 
 const MetricsTab = ({ onCopy }) => (
   <div className="space-y-6">
