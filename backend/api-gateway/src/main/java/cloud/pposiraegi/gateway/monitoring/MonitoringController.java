@@ -28,10 +28,9 @@ public class MonitoringController {
     private final WebClient prometheusClient;
 
     public MonitoringController(
-            WebClient.Builder webClientBuilder,
             @Value("${monitoring.prometheus.base-url:http://localhost:9090}") String prometheusBaseUrl
     ) {
-        this.prometheusClient = webClientBuilder
+        this.prometheusClient = WebClient.builder()
                 .baseUrl(prometheusBaseUrl)
                 .build();
     }
