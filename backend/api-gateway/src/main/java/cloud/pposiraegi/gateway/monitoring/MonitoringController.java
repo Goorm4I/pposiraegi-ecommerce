@@ -93,7 +93,7 @@ public class MonitoringController {
             String labelValue = result.metric().get(labelName);
             Double value = parseValue(result.value());
             if (labelValue != null && value != null) {
-                values.put(normalizeInstance(labelValue), round(value));
+                values.put(normalizeInstance(labelValue), value);
             }
         }
         return values;
