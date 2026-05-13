@@ -21,4 +21,4 @@ phases:
       - echo Pushing the Docker images...
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo Image pushed. ArgoCD manages Kubernetes manifests; rollout is triggered separately.
+      - echo "Image pushed. ArgoCD manages Kubernetes manifests; rollout is triggered separately."
