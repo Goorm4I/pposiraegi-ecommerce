@@ -51,8 +51,8 @@ public class MonitoringController {
         return prometheusClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/v1/query")
-                        .queryParam("query", query)
-                        .build())
+                        .queryParam("query", "{promql}")
+                        .build(query))
                 .retrieve()
                 .bodyToMono(PrometheusQueryResponse.class)
                 .timeout(Duration.ofSeconds(3))
