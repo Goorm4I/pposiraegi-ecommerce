@@ -15,6 +15,10 @@ phases:
       - echo "REACT_APP_API_URL=" >> frontend/.env
       - echo "REACT_APP_WS_URL=wss://pposiraegi.cloud/ws/events" >> frontend/.env
       - echo "REACT_APP_ADMIN_EMAILS=admin@test.com" >> frontend/.env
+      - echo "REACT_APP_GRAFANA_URL=${REACT_APP_GRAFANA_URL:-}" >> frontend/.env
+      - echo "REACT_APP_PROMETHEUS_URL=${REACT_APP_PROMETHEUS_URL:-}" >> frontend/.env
+      - echo "REACT_APP_LOKI_URL=${REACT_APP_LOKI_URL:-}" >> frontend/.env
+      - echo "REACT_APP_TEMPO_URL=${REACT_APP_TEMPO_URL:-}" >> frontend/.env
   build:
     commands:
       - echo Building Frontend...

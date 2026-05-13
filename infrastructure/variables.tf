@@ -78,6 +78,30 @@ variable "domain_name" {
   default     = "pposiraegi.cloud"
 }
 
+variable "frontend_grafana_url" {
+  description = "Frontend monitoring page Grafana link. Keep empty until Grafana is externally reachable."
+  type        = string
+  default     = "http://grafana.pposiraegi.cloud"
+}
+
+variable "frontend_prometheus_url" {
+  description = "Frontend monitoring page Prometheus link. Keep empty until Prometheus is externally reachable."
+  type        = string
+  default     = ""
+}
+
+variable "frontend_loki_url" {
+  description = "Frontend monitoring page Loki link. Usually empty because Loki is accessed via Grafana Explore."
+  type        = string
+  default     = ""
+}
+
+variable "frontend_tempo_url" {
+  description = "Frontend monitoring page Tempo link. Keep empty until Tempo is installed and reachable."
+  type        = string
+  default     = ""
+}
+
 variable "jwt_secret" {
   description = "JWT secret key for Spring Boot"
   sensitive   = true

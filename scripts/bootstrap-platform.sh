@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # bootstrap-platform.sh
 # pposiraegi EKS 플랫폼 컴포넌트 일괄 설치
-# 순서: metrics-server → argocd → karpenter → lbc → istio → monitoring → eso → argocd-sync
+# 순서: metrics-server → argocd → karpenter → lbc → istio → storage → monitoring → frontend-deploy → eso → argocd-sync
 #
 # 사전 요건:
 #   - kubectl, helm, aws CLI 설치 및 kubeconfig 설정 완료
@@ -11,6 +11,7 @@
 # 사용법:
 #   ./scripts/bootstrap-platform.sh                       # 전체 실행
 #   ./scripts/bootstrap-platform.sh --skip-argocd-sync   # argocd-sync 제외
+#   ./scripts/bootstrap-platform.sh --skip-frontend-deploy # monitoring 이후 frontend pipeline 트리거 제외
 #   ./scripts/bootstrap-platform.sh --from lbc            # lbc 단계부터 재개
 #   ./scripts/bootstrap-platform.sh --from=lbc            # 동일 (= 형태도 지원)
 #   ./scripts/bootstrap-platform.sh --only monitoring     # monitoring만 실행
@@ -18,7 +19,7 @@
 #   DISCORD_WEBHOOK_URL=... ./scripts/bootstrap-platform.sh --only monitoring
 #   DISCORD_WEBHOOK_SSM_PARAM=/pposiraegi/discord/webhook-url ./scripts/bootstrap-platform.sh
 #
-# 단계 이름: metrics-server | argocd | karpenter | lbc | istio | storage | monitoring | eso | argocd-sync
+# 단계 이름: metrics-server | argocd | karpenter | lbc | istio | storage | monitoring | frontend-deploy | eso | argocd-sync
 
 set -euo pipefail
 
@@ -41,6 +42,7 @@ ISTIO_VERSION="1.25.1"
 PROM_STACK_VERSION="67.9.0"
 LOKI_VERSION="6.29.0"
 ESO_VERSION="0.14.0"
+FRONTEND_PIPELINE_NAME="${FRONTEND_PIPELINE_NAME:-pposiraegi-frontend-pipeline}"
 
 # IRSA ARN — 계정 ID를 동적으로 참조
 KARPENTER_ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/pposiraegi-karpenter-controller"
@@ -384,10 +386,42 @@ install_monitoring() {
 }
 
 ###############################################################
-# 7. External Secrets Operator
+# 8. Frontend deploy trigger
+###############################################################
+deploy_frontend() {
+  log "=== 8. Frontend 배포 트리거 ==="
+
+  if [[ "${SKIP_FRONTEND_DEPLOY}" == true ]]; then
+    warn "frontend deploy 스킵 (--skip-frontend-deploy)"
+    return 0
+  fi
+
+  if ! aws codepipeline get-pipeline \
+    --name "${FRONTEND_PIPELINE_NAME}" \
+    --region "${AWS_REGION}" >/dev/null 2>&1; then
+    warn "CodePipeline '${FRONTEND_PIPELINE_NAME}' 없음 — frontend 자동 배포 생략"
+    warn "Terraform apply 후 pipeline이 생성됐는지 확인하세요."
+    return 0
+  fi
+
+  local execution_id
+  execution_id="$(aws codepipeline start-pipeline-execution \
+    --name "${FRONTEND_PIPELINE_NAME}" \
+    --region "${AWS_REGION}" \
+    --query 'pipelineExecutionId' \
+    --output text)"
+
+  ok "Frontend pipeline 시작: ${FRONTEND_PIPELINE_NAME} (${execution_id})"
+  discord_notify "pposiraegi frontend deploy triggered after monitoring ready (${FRONTEND_PIPELINE_NAME}/${execution_id})"
+  echo "  상태 확인:"
+  echo "    AWS_PROFILE=${AWS_PROFILE:-} aws codepipeline get-pipeline-execution --name ${FRONTEND_PIPELINE_NAME} --pipeline-execution-id ${execution_id} --region ${AWS_REGION}"
+}
+
+###############################################################
+# 9. External Secrets Operator
 ###############################################################
 install_eso() {
-  log "=== 8. External Secrets Operator 설치 ==="
+  log "=== 9. External Secrets Operator 설치 ==="
   helm_repo_add external-secrets https://charts.external-secrets.io
   helm repo update external-secrets
 
@@ -410,10 +444,10 @@ install_eso() {
 }
 
 ###############################################################
-# 8. ArgoCD sync (pposiraegi Application 등록)
+# 10. ArgoCD sync (pposiraegi Application 등록)
 ###############################################################
 sync_argocd() {
-  log "=== 9. ArgoCD Application sync ==="
+  log "=== 10. ArgoCD Application sync ==="
 
   local current_branch
   current_branch="$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD)"
@@ -469,6 +503,7 @@ print_summary() {
   printf "    %-30s %s\n" "Istio Ambient"         "${ISTIO_VERSION}"
   printf "    %-30s %s\n" "kube-prometheus-stack" "${PROM_STACK_VERSION}"
   printf "    %-30s %s\n" "Loki"                  "${LOKI_VERSION}"
+  printf "    %-30s %s\n" "Frontend Pipeline"     "${FRONTEND_PIPELINE_NAME}"
   printf "    %-30s %s\n" "ESO"                   "${ESO_VERSION}"
   echo ""
   echo "  다음 단계:"
@@ -484,6 +519,7 @@ print_summary() {
 # 메인
 ###############################################################
 SKIP_ARGOCD_SYNC=false
+SKIP_FRONTEND_DEPLOY=false
 FROM_STEP=""
 ONLY_STEP=""
 
@@ -491,16 +527,17 @@ ONLY_STEP=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-argocd-sync) SKIP_ARGOCD_SYNC=true; shift ;;
+    --skip-frontend-deploy) SKIP_FRONTEND_DEPLOY=true; shift ;;
     --from=*)  FROM_STEP="${1#--from=}"; shift ;;
     --from)    [[ $# -ge 2 ]] || die "--from 뒤에 단계 이름 필요"; FROM_STEP="$2"; shift 2 ;;
     --only=*)  ONLY_STEP="${1#--only=}"; shift ;;
     --only)    [[ $# -ge 2 ]] || die "--only 뒤에 단계 이름 필요"; ONLY_STEP="$2"; shift 2 ;;
-    *) die "알 수 없는 옵션: $1  (--from, --only, --skip-argocd-sync)" ;;
+    *) die "알 수 없는 옵션: $1  (--from, --only, --skip-argocd-sync, --skip-frontend-deploy)" ;;
   esac
 done
 
 # 단계 이름 유효성 검증
-STEPS=(metrics-server argocd karpenter lbc istio storage monitoring eso argocd-sync)
+STEPS=(metrics-server argocd karpenter lbc istio storage monitoring frontend-deploy eso argocd-sync)
 
 validate_step() {
   local name="$1" s
@@ -540,6 +577,7 @@ should_run lbc            && install_lbc
 should_run istio          && install_istio
 should_run storage        && install_storage
 should_run monitoring     && install_monitoring
+should_run frontend-deploy && deploy_frontend
 should_run eso            && install_eso
 should_run argocd-sync    && [[ "${SKIP_ARGOCD_SYNC}" == false ]] && sync_argocd
 

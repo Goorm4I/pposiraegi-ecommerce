@@ -1,25 +1,206 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { USE_MOCK } from '../api/config';
 import { eventWebSocket } from '../api/websocket';
 import { EVENT_TYPES } from '../mocks/events';
 import EventLog from '../components/EventLog';
 
+const isLocalBrowser = typeof window !== 'undefined'
+  && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const localOnlyUrl = (envValue, localDefault = '') => envValue || (isLocalBrowser ? localDefault : '');
+
+const grafanaUrl = localOnlyUrl(process.env.REACT_APP_GRAFANA_URL, 'http://localhost:3000');
+const prometheusUrl = localOnlyUrl(process.env.REACT_APP_PROMETHEUS_URL, 'http://localhost:9090');
+const lokiUrl = localOnlyUrl(process.env.REACT_APP_LOKI_URL);
+const tempoUrl = localOnlyUrl(process.env.REACT_APP_TEMPO_URL);
+
+const quickLinks = [
+  {
+    id: 'grafana',
+    name: 'Grafana',
+    role: 'Dashboard',
+    url: grafanaUrl,
+    description: 'Prometheus, Loki, Alert를 한 화면에서 확인합니다.',
+    command: 'kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80',
+  },
+  {
+    id: 'prometheus',
+    name: 'Prometheus',
+    role: 'Metrics',
+    url: prometheusUrl,
+    description: 'Latency, RPS, Hikari, JVM, scrape target을 직접 쿼리합니다.',
+    command: 'kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090',
+  },
+  {
+    id: 'loki',
+    name: 'Loki',
+    role: 'Logs',
+    url: lokiUrl,
+    description: 'Grafana Explore에서 production 로그와 timeout/error 로그를 확인합니다.',
+    command: 'kubectl get pods -n monitoring -l app.kubernetes.io/name=loki',
+  },
+  {
+    id: 'tempo',
+    name: 'Tempo',
+    role: 'Traces',
+    url: tempoUrl,
+    description: '추후 OpenTelemetry 도입 후 요청 단위 병목을 추적합니다.',
+    command: 'Tempo 미설치 상태면 Prometheus + Loki로 1차 진단',
+    disabled: !tempoUrl,
+  },
+].map(item => ({ ...item, disabled: item.disabled || !item.url }));
+
+const serviceHealth = [
+  {
+    name: 'api-gateway',
+    owner: 'Ingress / Routing',
+    metric: 'HTTP latency, 5xx, route saturation',
+    risk: 'ALB target health, route timeout',
+    query: 'histogram_quantile(0.95, sum by (le, uri, status) (rate(http_server_requests_seconds_bucket{namespace="production", service="api-gateway"}[5m])))',
+  },
+  {
+    name: 'order-service',
+    owner: 'Order / Checkout',
+    metric: 'Hikari pending, order p95, error rate',
+    risk: 'RDS connection budget 초과',
+    query: 'hikaricp_connections_pending{namespace="production"}',
+  },
+  {
+    name: 'product-service',
+    owner: 'Stock / Product',
+    metric: 'Redis gate, stock update, product query',
+    risk: '재고 검증 지연 또는 Redis/RDS 경합',
+    query: 'rate(http_server_requests_seconds_count{namespace="production", service="product-service"}[5m])',
+  },
+  {
+    name: 'user-service',
+    owner: 'Auth / User',
+    metric: 'login latency, token failure, DB pool',
+    risk: '인증 지연이 gateway 전체 지연으로 전파',
+    query: 'rate(http_server_requests_seconds_count{namespace="production", service="user-service"}[5m])',
+  },
+];
+
+const operatingSignals = [
+  {
+    label: '주문 지연',
+    value: 'p95 / p99',
+    tone: 'red',
+    description: '사용자가 느끼는 속도. 부하테스트의 1차 판정 기준.',
+  },
+  {
+    label: 'DB 대기',
+    value: 'Hikari pending',
+    tone: 'amber',
+    description: 'Pod를 늘려도 해결되지 않는 RDS 커넥션 병목 신호.',
+  },
+  {
+    label: '수집 상태',
+    value: 'Targets UP',
+    tone: 'blue',
+    description: '앱이 정상이어도 scrape가 비면 판단 근거가 사라짐.',
+  },
+  {
+    label: '로그 사건',
+    value: 'timeout / error',
+    tone: 'gray',
+    description: 'Prometheus가 숫자를 보여주면 Loki가 사건을 설명.',
+  },
+];
+
+const runbookItems = [
+  {
+    title: 'Grafana가 안 열릴 때',
+    checks: [
+      'port-forward가 살아있는지 확인',
+      'monitoring namespace의 grafana pod가 Running인지 확인',
+      '브라우저 URL이 REACT_APP_GRAFANA_URL과 맞는지 확인',
+    ],
+  },
+  {
+    title: 'Prometheus target이 비었을 때',
+    checks: [
+      'service/deployment annotation의 prometheus.io/port=8081 확인',
+      '/actuator/prometheus exposure 확인',
+      'Istio AuthorizationPolicy가 Prometheus SA를 허용하는지 확인',
+    ],
+  },
+  {
+    title: '주문은 느린데 노드는 여유로울 때',
+    checks: [
+      'Hikari pending과 active connection 확인',
+      'RDS DatabaseConnections / CPU / latency 확인',
+      'HPA replica 증설이 DB connection budget을 넘는지 계산',
+    ],
+  },
+  {
+    title: '로그가 안 보일 때',
+    checks: [
+      'promtail daemonset이 Running인지 확인',
+      'Loki single binary pod와 gateway 상태 확인',
+      'Grafana datasource Loki URL이 http://loki:3100인지 확인',
+    ],
+  },
+];
+
+const promqlSnippets = [
+  {
+    title: 'HTTP p95 latency',
+    description: '서비스/URI별 느린 구간을 먼저 찾습니다.',
+    query: 'histogram_quantile(0.95, sum by (le, service, uri, method, status) (rate(http_server_requests_seconds_bucket{namespace="production"}[5m])))',
+  },
+  {
+    title: 'Hikari pending',
+    description: 'DB 커넥션 풀이 고갈되는 순간을 봅니다.',
+    query: 'hikaricp_connections_pending{namespace="production"}',
+  },
+  {
+    title: 'Error rate',
+    description: '5xx 비율이 지연과 같이 튀는지 확인합니다.',
+    query: 'sum by (service, status) (rate(http_server_requests_seconds_count{namespace="production", status=~"5.."}[5m]))',
+  },
+  {
+    title: 'Scrape target health',
+    description: '관측 파이프라인이 살아있는지 먼저 봅니다.',
+    query: 'up{namespace="production"}',
+  },
+];
+
+const logqlSnippets = [
+  {
+    title: 'Order timeout',
+    query: '{namespace="production", app="order-service"} |= "timeout"',
+  },
+  {
+    title: 'Hikari connection failure',
+    query: '{namespace="production"} |= "HikariPool" |= "Connection is not available"',
+  },
+  {
+    title: 'Exception timeline',
+    query: '{namespace="production"} |~ "ERROR|Exception|Caused by"',
+  },
+];
+
+const toneStyle = {
+  red: 'bg-red-50 text-red-700 border-red-100',
+  amber: 'bg-amber-50 text-amber-700 border-amber-100',
+  blue: 'bg-blue-50 text-blue-700 border-blue-100',
+  gray: 'bg-gray-100 text-gray-700 border-gray-200',
+  green: 'bg-green-50 text-green-700 border-green-100',
+};
+
 const EventMonitor = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('overview');
   const [events, setEvents] = useState([]);
-  const [stats, setStats] = useState({
-    total: 0,
-    success: 0,
-    failed: 0,
-  });
+  const [stats, setStats] = useState({ total: 0, success: 0, failed: 0 });
   const [filter, setFilter] = useState('ALL');
   const [isConnected, setIsConnected] = useState(false);
-  const [activeTab, setActiveTab] = useState('flow');
+  const [copied, setCopied] = useState('');
 
   useEffect(() => {
     eventWebSocket.connect();
-    setIsConnected(true);
+    setIsConnected(!USE_MOCK);
 
     const unsubscribe = eventWebSocket.subscribe((event) => {
       setEvents(prev => [event, ...prev].slice(0, 100));
@@ -37,67 +218,68 @@ const EventMonitor = () => {
     };
   }, []);
 
-  const filteredEvents = filter === 'ALL' 
-    ? events 
-    : events.filter(e => e.eventType === filter);
+  const filteredEvents = useMemo(() => (
+    filter === 'ALL' ? events : events.filter(e => e.eventType === filter)
+  ), [events, filter]);
+
+  const handleCopy = async (text, label) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(label);
+      setTimeout(() => setCopied(''), 1600);
+    } catch {
+      setCopied('복사 실패');
+      setTimeout(() => setCopied(''), 1600);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
-      <header className="bg-white border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">
-                📊 주문 처리 모니터링
-              </h1>
-              <p className="text-gray-500 text-sm mt-1">
-                Choreography Saga 패턴 기반 실시간 이벤트 스트리밍
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-1">
+                <Link to="/admin" className="hover:text-slate-800">관리자 콘솔</Link>
+                <span>/</span>
+                <span>운영 모니터링</span>
+              </div>
+              <h1 className="text-2xl font-black tracking-tight text-slate-950">운영 모니터링 허브</h1>
+              <p className="text-sm text-slate-500 mt-1">
+                Prometheus, Grafana, Loki, 이벤트 로그를 한 화면에서 연결합니다. 네트워크가 달라도 화면은 안전하게 동작하도록 링크와 쿼리 중심으로 구성했습니다.
               </p>
             </div>
-            <div className="flex items-center gap-4">
-              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
-                USE_MOCK 
-                  ? 'bg-yellow-100 text-yellow-700' 
-                  : isConnected
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-red-100 text-red-700'
-              }`}>
-                <span className={`w-2 h-2 rounded-full ${
-                  USE_MOCK 
-                    ? 'bg-yellow-500' 
-                    : isConnected 
-                      ? 'bg-green-500 animate-pulse' 
-                      : 'bg-red-500'
-                }`}></span>
-                {USE_MOCK ? 'Mock 모드' : isConnected ? 'WebSocket 연결됨' : '연결 끊김'}
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <StateBadge label={USE_MOCK ? 'Mock mode' : isConnected ? 'WebSocket ready' : 'WebSocket check'} tone={USE_MOCK ? 'amber' : isConnected ? 'green' : 'red'} />
+              {copied && <StateBadge label={copied} tone="blue" />}
               <button
                 onClick={() => navigate('/')}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:bg-slate-50"
               >
-                ← 목록으로
+                목록으로
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      {/* 탭 */}
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4">
-          <div className="flex gap-1">
+      <nav className="bg-white border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex gap-1 overflow-x-auto">
             {[
-              { id: 'flow', label: '🔄 Saga 플로우' },
-              { id: 'realtime', label: '⚡ 실시간 이벤트' },
+              { id: 'overview', label: '개요' },
+              { id: 'metrics', label: '지표/쿼리' },
+              { id: 'logs', label: '로그' },
+              { id: 'runbook', label: '런북' },
+              { id: 'events', label: '이벤트' },
             ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-6 py-4 font-medium transition border-b-2 ${
+                className={`px-5 py-3 text-sm font-black border-b-2 whitespace-nowrap ${
                   activeTab === tab.id
-                    ? 'border-primary-500 text-primary-600 bg-primary-50'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'border-slate-950 text-slate-950'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
                 {tab.label}
@@ -105,12 +287,15 @@ const EventMonitor = () => {
             ))}
           </div>
         </div>
-      </div>
+      </nav>
 
-      <main className="container mx-auto px-4 py-8">
-        {activeTab === 'flow' && <SagaFlowTab />}
-        {activeTab === 'realtime' && (
-          <RealtimeTab 
+      <main className="max-w-7xl mx-auto px-4 py-6">
+        {activeTab === 'overview' && <OverviewTab onCopy={handleCopy} />}
+        {activeTab === 'metrics' && <MetricsTab onCopy={handleCopy} />}
+        {activeTab === 'logs' && <LogsTab onCopy={handleCopy} />}
+        {activeTab === 'runbook' && <RunbookTab onCopy={handleCopy} />}
+        {activeTab === 'events' && (
+          <EventsTab
             events={filteredEvents}
             stats={stats}
             filter={filter}
@@ -122,161 +307,180 @@ const EventMonitor = () => {
   );
 };
 
-/* ─────────────────────────────────────────────────────────────────
-   Saga 플로우 탭
-───────────────────────────────────────────────────────────────── */
-const SagaFlowTab = () => (
-  <div className="space-y-8">
-    <div className="bg-white rounded-xl p-6 shadow-sm border">
-      <h2 className="text-lg font-bold text-gray-800 mb-4">
-        🏗️ Choreography Saga 패턴
-      </h2>
-      <p className="text-gray-600 mb-6">
-        각 서비스가 Kafka 이벤트를 발행/구독하여 분산 트랜잭션을 처리합니다.
-        중앙 조정자 없이 서비스들이 자율적으로 협력합니다.
-      </p>
+const OverviewTab = ({ onCopy }) => (
+  <div className="space-y-6">
+    <section className="grid lg:grid-cols-[1.35fr_.65fr] gap-4">
+      <div className="bg-slate-950 text-white rounded-xl p-6">
+        <div className="text-sm font-bold text-slate-300 mb-2">현재 운영 판단 기준</div>
+        <h2 className="text-3xl font-black leading-tight">EKS가 모든 병목을 해결하는 것이 아니라, 확장해도 되는 선을 지표로 관리합니다.</h2>
+        <p className="text-slate-300 text-sm leading-6 mt-4 max-w-3xl">
+          주문 지연이 발생하면 먼저 HTTP latency와 Hikari pending을 보고, DB 커넥션 병목인지 Pod/Node 확장 문제인지 분리합니다.
+          Grafana는 대시보드, Prometheus는 숫자, Loki는 사건 로그를 맡습니다.
+        </p>
+      </div>
 
-      <div className="bg-gray-50 rounded-lg p-6 overflow-x-auto">
-        <div className="min-w-[700px]">
-          {/* 성공 플로우 */}
-          <div className="mb-8">
-            <div className="text-sm font-semibold text-green-600 mb-3">✅ 성공 플로우</div>
-            <div className="flex items-center gap-2">
-              <FlowStep service="Order" event="ORDER_CREATED" color="blue" icon="📝" />
-              <FlowArrow />
-              <FlowStep service="Stock" event="STOCK_RESERVED" color="green" icon="📦" />
-              <FlowArrow />
-              <FlowStep service="Payment" event="PAYMENT_COMPLETED" color="purple" icon="💳" />
-              <FlowArrow />
-              <FlowStep service="Order" event="ORDER_COMPLETED" color="green" icon="✅" />
-            </div>
-          </div>
-
-          {/* 실패 플로우 */}
-          <div>
-            <div className="text-sm font-semibold text-red-600 mb-3">❌ 실패 플로우 (보상 트랜잭션)</div>
-            <div className="flex items-center gap-2">
-              <FlowStep service="Order" event="ORDER_CREATED" color="blue" icon="📝" />
-              <FlowArrow />
-              <FlowStep service="Stock" event="STOCK_RESERVED" color="green" icon="📦" />
-              <FlowArrow />
-              <FlowStep service="Payment" event="PAYMENT_FAILED" color="red" icon="💳" />
-              <FlowArrow type="rollback" />
-              <FlowStep service="Stock" event="STOCK_ROLLBACK" color="orange" icon="↩️" />
-              <FlowArrow type="rollback" />
-              <FlowStep service="Order" event="ORDER_CANCELLED" color="red" icon="❌" />
-            </div>
-          </div>
+      <div className="bg-white rounded-xl border border-slate-200 p-5">
+        <div className="text-sm font-black text-slate-500 mb-3">연결 전제</div>
+        <div className="space-y-3">
+          <CheckLine text="bootstrap-platform.sh로 monitoring stack 설치" />
+          <CheckLine text="배포 환경은 REACT_APP_GRAFANA_URL / REACT_APP_PROMETHEUS_URL 값이 있어야 버튼이 활성화됨" />
+          <CheckLine text="앱 서비스는 8081 /actuator/prometheus scrape" />
+          <CheckLine text="Loki는 Grafana Explore에서 확인" />
         </div>
       </div>
+    </section>
+
+    <section className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
+      {operatingSignals.map(signal => (
+        <div key={signal.label} className={`border rounded-xl p-4 ${toneStyle[signal.tone]}`}>
+          <div className="text-xs font-black opacity-70">{signal.label}</div>
+          <div className="text-2xl font-black mt-1">{signal.value}</div>
+          <p className="text-sm leading-5 mt-2 opacity-80">{signal.description}</p>
+        </div>
+      ))}
+    </section>
+
+    <section className="grid lg:grid-cols-4 gap-3">
+      {quickLinks.map(link => (
+        <ToolLinkCard key={link.id} item={link} onCopy={onCopy} />
+      ))}
+    </section>
+
+    <section className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <h2 className="font-black text-slate-900">서비스별 관측 포인트</h2>
+          <p className="text-sm text-slate-500 mt-1">처음부터 모든 지표를 보지 말고, 서비스별 병목 후보를 좁혀 봅니다.</p>
+        </div>
+      </div>
+      <div className="grid lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-slate-200">
+        {serviceHealth.map(service => (
+          <ServiceSignal key={service.name} service={service} onCopy={onCopy} />
+        ))}
+      </div>
+    </section>
+  </div>
+);
+
+const MetricsTab = ({ onCopy }) => (
+  <div className="space-y-6">
+    <SectionHeader
+      title="Prometheus 쿼리"
+      description="속도, 에러율, DB 커넥션 대기처럼 숫자로 증명해야 하는 항목입니다."
+    />
+    <div className="grid lg:grid-cols-2 gap-4">
+      {promqlSnippets.map(item => (
+        <QueryCard key={item.title} type="PromQL" item={item} onCopy={onCopy} />
+      ))}
     </div>
 
-    {/* 서비스 카드 */}
-    <div className="grid md:grid-cols-3 gap-4">
-      <ServiceCard
-        name="Order Service"
-        icon="📝"
-        color="blue"
-        responsibilities={["주문 생성/상태 관리", "ORDER_CREATED 발행", "최종 상태 업데이트"]}
-      />
-      <ServiceCard
-        name="Stock Service"
-        icon="📦"
-        color="green"
-        responsibilities={["재고 확인/차감", "동시성 제어 (락)", "보상: 재고 복구"]}
-      />
-      <ServiceCard
-        name="Payment Service"
-        icon="💳"
-        color="purple"
-        responsibilities={["결제 처리", "잔액 확인", "결제 실패 이벤트"]}
-      />
-    </div>
-
-    {/* 기술 스택 */}
-    <div className="bg-white rounded-xl p-6 shadow-sm border">
-      <h2 className="text-lg font-bold text-gray-800 mb-4">🛠️ 기술 스택</h2>
-      <div className="grid md:grid-cols-2 gap-6">
-        <div>
-          <h3 className="font-semibold text-gray-700 mb-2">Backend</h3>
-          <div className="flex flex-wrap gap-2">
-            {['Spring Boot', 'Kafka', 'Redis', 'MySQL'].map(tech => (
-              <span key={tech} className="px-3 py-1 bg-gray-100 rounded-full text-sm">{tech}</span>
-            ))}
+    <div className="bg-white rounded-xl border border-slate-200 p-5">
+      <h3 className="text-lg font-black mb-3">부하테스트 판정 흐름</h3>
+      <div className="grid md:grid-cols-5 gap-3">
+        {['주문 요청 증가', 'HTTP p95 상승', 'Hikari pending 확인', 'RDS 지표 대조', 'HPA/NodeClaim 확인'].map((step, idx) => (
+          <div key={step} className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+            <div className="w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-black mb-2">{idx + 1}</div>
+            <div className="text-sm font-black text-slate-800">{step}</div>
           </div>
-        </div>
-        <div>
-          <h3 className="font-semibold text-gray-700 mb-2">Infra</h3>
-          <div className="flex flex-wrap gap-2">
-            {['AWS EKS', 'MSK (Kafka)', 'ECR', 'ALB'].map(tech => (
-              <span key={tech} className="px-3 py-1 bg-gray-100 rounded-full text-sm">{tech}</span>
-            ))}
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   </div>
 );
 
-/* ─────────────────────────────────────────────────────────────────
-   실시간 이벤트 탭
-───────────────────────────────────────────────────────────────── */
-const RealtimeTab = ({ events, stats, filter, setFilter }) => (
+const LogsTab = ({ onCopy }) => (
   <div className="space-y-6">
-    {/* 통계 */}
-    <div className="grid grid-cols-4 gap-4">
-      <StatCard label="총 주문" value={stats.total} color="gray" />
-      <StatCard label="성공" value={stats.success} color="green" />
-      <StatCard label="실패" value={stats.failed} color="red" />
-      <StatCard 
-        label="성공률" 
-        value={stats.total > 0 ? `${Math.round((stats.success / stats.total) * 100)}%` : '-'} 
-        color="blue" 
-      />
-    </div>
-
-    {/* 필터 */}
-    <div className="flex gap-2 flex-wrap">
-      <button
-        onClick={() => setFilter('ALL')}
-        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-          filter === 'ALL' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-        }`}
-      >
-        전체
-      </button>
-      {Object.entries(EVENT_TYPES).map(([type, info]) => (
-        <button
-          key={type}
-          onClick={() => setFilter(type)}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-            filter === type ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
-        >
-          {info.icon} {info.label}
-        </button>
+    <SectionHeader
+      title="Loki 로그 탐색"
+      description="Prometheus가 느려진 시간을 알려주면, Loki는 그 시간대에 어떤 사건이 있었는지 확인합니다."
+    />
+    <div className="grid lg:grid-cols-3 gap-4">
+      {logqlSnippets.map(item => (
+        <QueryCard key={item.title} type="LogQL" item={item} onCopy={onCopy} />
       ))}
     </div>
 
-    {/* 이벤트 로그 */}
-    <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-      <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
-        <h3 className="font-semibold text-gray-800">📜 실시간 Kafka 이벤트</h3>
-        <span className="text-sm text-gray-500">{events.length}건</span>
+    <div className="bg-white rounded-xl border border-slate-200 p-5">
+      <h3 className="font-black text-slate-900 mb-2">Tempo 도입 전/후</h3>
+      <div className="grid md:grid-cols-3 gap-3">
+        <InfoBlock title="Prometheus" body="느려졌다는 사실과 범위를 숫자로 확인합니다." />
+        <InfoBlock title="Loki" body="timeout, exception, pool exhaustion 같은 사건 로그를 확인합니다." />
+        <InfoBlock title="Tempo" body="요청 하나가 gateway, order, product, DB 중 어디서 느렸는지 추적합니다." />
       </div>
-      
-      <div className="max-h-[500px] overflow-y-auto">
+    </div>
+  </div>
+);
+
+const RunbookTab = ({ onCopy }) => (
+  <div className="space-y-6">
+    <SectionHeader
+      title="연결 문제 방어 런북"
+      description="네트워크, 포트, API 불일치가 터질 가능성이 높아서, 화면 안에 바로 확인할 순서를 남깁니다."
+    />
+    <div className="grid lg:grid-cols-2 gap-4">
+      {runbookItems.map(item => (
+        <div key={item.title} className="bg-white rounded-xl border border-slate-200 p-5">
+          <h3 className="font-black text-slate-900 mb-3">{item.title}</h3>
+          <div className="space-y-2">
+            {item.checks.map(check => <CheckLine key={check} text={check} />)}
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <div className="bg-slate-950 text-white rounded-xl p-5">
+      <div className="text-sm font-black text-slate-300 mb-2">권장 실행 순서</div>
+      <code className="block text-sm leading-7 whitespace-pre-wrap">
+        {'AWS_PROFILE=goorm ./scripts/bootstrap-platform.sh --only monitoring --skip-argocd-sync\nkubectl get pods -n monitoring\nkubectl get svc -n monitoring\nkubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80'}
+      </code>
+      <button
+        onClick={() => onCopy('AWS_PROFILE=goorm ./scripts/bootstrap-platform.sh --only monitoring --skip-argocd-sync\nkubectl get pods -n monitoring\nkubectl get svc -n monitoring\nkubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80', '런북 복사됨')}
+        className="mt-4 px-4 py-2 rounded-lg bg-white text-slate-950 text-sm font-black hover:bg-slate-100"
+      >
+        명령 복사
+      </button>
+    </div>
+  </div>
+);
+
+const EventsTab = ({ events, stats, filter, setFilter }) => (
+  <div className="space-y-6">
+    <SectionHeader
+      title="주문 이벤트"
+      description="기존 실시간 이벤트 뷰는 운영 콘솔의 하위 탭으로 유지합니다."
+    />
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <EventStat label="총 주문" value={stats.total} />
+      <EventStat label="성공" value={stats.success} tone="green" />
+      <EventStat label="실패" value={stats.failed} tone="red" />
+      <EventStat label="성공률" value={stats.total > 0 ? `${Math.round((stats.success / stats.total) * 100)}%` : '-'} tone="blue" />
+    </div>
+
+    <div className="bg-white rounded-xl border border-slate-200 p-4">
+      <div className="flex gap-2 flex-wrap">
+        <FilterButton active={filter === 'ALL'} onClick={() => setFilter('ALL')}>전체</FilterButton>
+        {Object.entries(EVENT_TYPES).map(([type, info]) => (
+          <FilterButton key={type} active={filter === type} onClick={() => setFilter(type)}>
+            {info.label}
+          </FilterButton>
+        ))}
+      </div>
+    </div>
+
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-200 flex justify-between items-center">
+        <h3 className="font-black text-slate-900">실시간 이벤트 로그</h3>
+        <span className="text-sm text-slate-500">{events.length}건</span>
+      </div>
+      <div className="max-h-[520px] overflow-y-auto">
         {events.length === 0 ? (
-          <div className="py-12 text-center text-gray-400">
-            <div className="text-4xl mb-3">📡</div>
-            <p>이벤트 대기 중...</p>
-            <p className="text-sm mt-1">주문이 발생하면 실시간으로 표시됩니다</p>
+          <div className="py-14 text-center text-slate-400">
+            <p className="font-bold">이벤트 대기 중</p>
+            <p className="text-sm mt-1">주문 이벤트가 들어오면 여기에 표시됩니다.</p>
           </div>
         ) : (
-          <div className="divide-y">
-            {events.map(event => (
-              <EventLog key={event.id} event={event} />
-            ))}
+          <div className="divide-y divide-slate-100">
+            {events.map(event => <EventLog key={event.id} event={event} />)}
           </div>
         )}
       </div>
@@ -284,73 +488,118 @@ const RealtimeTab = ({ events, stats, filter, setFilter }) => (
   </div>
 );
 
-/* ─────────────────────────────────────────────────────────────────
-   서브 컴포넌트
-───────────────────────────────────────────────────────────────── */
-const FlowStep = ({ service, event, color, icon }) => {
-  const colors = {
-    blue: 'bg-blue-100 border-blue-300 text-blue-700',
-    green: 'bg-green-100 border-green-300 text-green-700',
-    purple: 'bg-purple-100 border-purple-300 text-purple-700',
-    red: 'bg-red-100 border-red-300 text-red-700',
-    orange: 'bg-orange-100 border-orange-300 text-orange-700',
-  };
-
-  return (
-    <div className={`flex flex-col items-center px-4 py-3 rounded-lg border-2 ${colors[color]} min-w-[120px]`}>
-      <span className="text-2xl mb-1">{icon}</span>
-      <span className="text-xs font-semibold">{service}</span>
-      <span className="text-[10px] mt-1 opacity-75">{event}</span>
+const ToolLinkCard = ({ item, onCopy }) => (
+  <div className={`bg-white rounded-xl border border-slate-200 p-4 ${item.disabled ? 'opacity-65' : ''}`}>
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <div className="text-xs font-black text-slate-500">{item.role}</div>
+        <h3 className="text-lg font-black text-slate-900 mt-1">{item.name}</h3>
+      </div>
+      <StateBadge label={item.disabled ? 'Later' : 'Ready'} tone={item.disabled ? 'gray' : 'green'} />
     </div>
-  );
-};
-
-const FlowArrow = ({ type = 'normal' }) => (
-  <div className={`flex-shrink-0 ${type === 'rollback' ? 'text-orange-400' : 'text-gray-400'}`}>
-    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-    </svg>
+    <p className="text-sm text-slate-500 leading-5 mt-3 min-h-[42px]">{item.description}</p>
+    <div className="flex gap-2 mt-4">
+      {!item.disabled && item.url ? (
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noreferrer"
+          className="flex-1 text-center px-3 py-2 rounded-lg bg-slate-900 text-white text-sm font-black hover:bg-slate-700"
+        >
+          열기
+        </a>
+      ) : (
+        <button disabled className="flex-1 px-3 py-2 rounded-lg bg-slate-100 text-slate-400 text-sm font-black">
+          URL 필요
+        </button>
+      )}
+      <button
+        onClick={() => onCopy(item.command, `${item.name} 명령 복사됨`)}
+        className="px-3 py-2 rounded-lg border border-slate-200 text-sm font-black text-slate-600 hover:bg-slate-50"
+      >
+        명령
+      </button>
+    </div>
   </div>
 );
 
-const ServiceCard = ({ name, icon, color, responsibilities }) => {
-  const colors = {
-    blue: 'border-blue-200 bg-blue-50',
-    green: 'border-green-200 bg-green-50',
-    purple: 'border-purple-200 bg-purple-50',
-  };
+const ServiceSignal = ({ service, onCopy }) => (
+  <div className="p-4">
+    <div className="text-xs font-black text-slate-500">{service.owner}</div>
+    <h3 className="text-lg font-black text-slate-900 mt-1">{service.name}</h3>
+    <p className="text-sm text-slate-600 leading-5 mt-3">{service.metric}</p>
+    <p className="text-xs text-red-600 font-bold mt-2">{service.risk}</p>
+    <button
+      onClick={() => onCopy(service.query, `${service.name} 쿼리 복사됨`)}
+      className="mt-4 px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-xs font-black hover:bg-slate-200"
+    >
+      대표 쿼리 복사
+    </button>
+  </div>
+);
 
-  return (
-    <div className={`rounded-xl border-2 p-5 ${colors[color]}`}>
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-2xl">{icon}</span>
-        <h3 className="font-bold text-gray-800">{name}</h3>
+const QueryCard = ({ type, item, onCopy }) => (
+  <div className="bg-white rounded-xl border border-slate-200 p-5">
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <div className="text-xs font-black text-slate-500">{type}</div>
+        <h3 className="font-black text-slate-900 mt-1">{item.title}</h3>
       </div>
-      <div className="space-y-2">
-        {responsibilities.map((r, i) => (
-          <p key={i} className="text-sm text-gray-600 flex items-start gap-2">
-            <span className="text-gray-400">•</span>{r}
-          </p>
-        ))}
-      </div>
+      <button
+        onClick={() => onCopy(item.query, `${item.title} 복사됨`)}
+        className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-black text-slate-600 hover:bg-slate-50"
+      >
+        복사
+      </button>
     </div>
-  );
-};
+    {item.description && <p className="text-sm text-slate-500 leading-5 mt-2">{item.description}</p>}
+    <pre className="mt-4 bg-slate-950 text-slate-100 rounded-lg p-3 text-xs leading-5 overflow-x-auto"><code>{item.query}</code></pre>
+  </div>
+);
 
-const StatCard = ({ label, value, color }) => {
-  const colors = {
-    gray: 'bg-gray-100 text-gray-800',
-    blue: 'bg-blue-100 text-blue-800',
-    green: 'bg-green-100 text-green-800',
-    red: 'bg-red-100 text-red-800',
-  };
+const SectionHeader = ({ title, description }) => (
+  <div>
+    <h2 className="text-xl font-black text-slate-950">{title}</h2>
+    <p className="text-sm text-slate-500 mt-1">{description}</p>
+  </div>
+);
 
-  return (
-    <div className={`rounded-xl p-4 ${colors[color]}`}>
-      <p className="text-sm opacity-75">{label}</p>
-      <p className="text-3xl font-bold">{value}</p>
-    </div>
-  );
-};
+const InfoBlock = ({ title, body }) => (
+  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+    <div className="font-black text-slate-900">{title}</div>
+    <p className="text-sm text-slate-500 leading-5 mt-2">{body}</p>
+  </div>
+);
+
+const CheckLine = ({ text }) => (
+  <div className="flex items-start gap-2 text-sm text-slate-600">
+    <span className="mt-1.5 h-2 w-2 rounded-full bg-slate-900 flex-shrink-0" />
+    <span>{text}</span>
+  </div>
+);
+
+const StateBadge = ({ label, tone = 'gray' }) => (
+  <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-black ${toneStyle[tone] || toneStyle.gray}`}>
+    {label}
+  </span>
+);
+
+const EventStat = ({ label, value, tone = 'gray' }) => (
+  <div className={`rounded-xl border p-4 ${toneStyle[tone] || toneStyle.gray}`}>
+    <p className="text-sm font-bold opacity-75">{label}</p>
+    <p className="text-3xl font-black mt-1">{value}</p>
+  </div>
+);
+
+const FilterButton = ({ active, onClick, children }) => (
+  <button
+    onClick={onClick}
+    className={`px-3 py-1.5 rounded-lg text-sm font-bold transition ${
+      active ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+    }`}
+  >
+    {children}
+  </button>
+);
 
 export default EventMonitor;

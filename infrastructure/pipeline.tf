@@ -192,6 +192,22 @@ resource "aws_codebuild_project" "frontend" {
       name  = "CLOUDFRONT_ID"
       value = aws_cloudfront_distribution.frontend.id
     }
+    environment_variable {
+      name  = "REACT_APP_GRAFANA_URL"
+      value = var.frontend_grafana_url
+    }
+    environment_variable {
+      name  = "REACT_APP_PROMETHEUS_URL"
+      value = var.frontend_prometheus_url
+    }
+    environment_variable {
+      name  = "REACT_APP_LOKI_URL"
+      value = var.frontend_loki_url
+    }
+    environment_variable {
+      name  = "REACT_APP_TEMPO_URL"
+      value = var.frontend_tempo_url
+    }
   }
 
   source {
