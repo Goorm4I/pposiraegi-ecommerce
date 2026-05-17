@@ -339,6 +339,14 @@ OtlpMeterRegistry가 localhost:4318/v1/metrics로 metrics export를 시도하며
 이 프로젝트에서는 metrics는 Prometheus scrape가 담당한다.
 OTLP는 traces 경로로 제한하고, metrics OTLP export는 끈다.
 
+검증 결과:
+
+```text
+MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED=false 반영
+ArgoCD sync 후 4개 서비스 롤링 완료
+새 Pod 기준 90초 동안 OtlpMeterRegistry / localhost:4318 WARN 재발 없음
+```
+
 ## 당장 하지 않을 것
 
 - Tempo distributed mode
