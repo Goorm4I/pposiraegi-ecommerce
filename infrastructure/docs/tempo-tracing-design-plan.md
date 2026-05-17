@@ -290,6 +290,55 @@ Collector/Tempo는 best-effort 관측 경로다.
 관측성 장애와 서비스 장애를 분리한다.
 ```
 
+## 실제 검증에서 배운 점
+
+Tempo는 설치 성공과 운영 성공을 반드시 나눠서 봐야 한다.
+
+```text
+Platform Ready:
+  tempo-0 Running
+  opentelemetry-collector Running
+  Grafana Tempo datasource 등록
+  /api/search에서 trace 검색 가능
+
+Operational Trace Ready:
+  비즈니스 요청 1건이 trace로 검색됨
+  api-gateway -> product/order/user span이 같은 trace id로 연결됨
+  Loki 로그에서도 같은 trace_id로 검색 가능
+```
+
+실제 확인 결과:
+
+```text
+Tempo search에서 확인된 것:
+  api-gateway /actuator/health
+  api-gateway /actuator/prometheus
+  user-service security filter span
+  product-service scheduler task span
+
+아직 부족한 것:
+  /api/v1/time-deals route trace 검색
+  주문 요청 1건의 gateway -> service -> DB/Redis hop별 duration
+  Loki 로그의 trace_id와 Tempo trace id 연결
+```
+
+이 상태의 해석:
+
+```text
+Tempo는 빈 껍데기가 아니다. trace ingest는 된다.
+하지만 운영자가 원하는 trace가 아니라 platform noise와 background task가 먼저 보인다.
+따라서 다음 작업은 "Tempo 설치"가 아니라 "비즈니스 요청 trace 품질 개선"이다.
+```
+
+추가로 발견한 설정 노이즈:
+
+```text
+OtlpMeterRegistry가 localhost:4318/v1/metrics로 metrics export를 시도하며 WARN 발생
+```
+
+이 프로젝트에서는 metrics는 Prometheus scrape가 담당한다.
+OTLP는 traces 경로로 제한하고, metrics OTLP export는 끈다.
+
 ## 당장 하지 않을 것
 
 - Tempo distributed mode

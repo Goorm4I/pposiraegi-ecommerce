@@ -388,20 +388,44 @@ management:
   tracing:
     sampling:
       probability: 1.0
-  otlp:
+  opentelemetry:
     tracing:
-      endpoint: http://opentelemetry-collector.monitoring.svc.cluster.local:4318/v1/traces
+      export:
+        otlp:
+          endpoint: http://opentelemetry-collector.monitoring.svc.cluster.local:4318/v1/traces
+  otlp:
+    metrics:
+      export:
+        enabled: false
 ```
 
 Kubernetes env로는 다음 이름이 핵심이다.
 
 ```text
 MANAGEMENT_TRACING_SAMPLING_PROBABILITY
-MANAGEMENT_OTLP_TRACING_ENDPOINT
+MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT
+MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED=false
 ```
 
-`MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT`처럼 잘못된 property 이름을 쓰면
-Collector와 Tempo가 정상이어도 앱 span이 전송되지 않는다.
+Prometheus를 metrics 경로로 쓰는 상태에서 OTLP metrics export까지 켜지면
+앱이 `localhost:4318/v1/metrics`로 metrics를 보내려다 WARN 로그를 계속 만들 수 있다.
+따라서 이 프로젝트에서는 metrics는 Prometheus scrape, traces는 OTLP Collector로 역할을 분리한다.
+
+실제 검증에서 확인한 상태:
+
+```text
+Tempo/Collector/Grafana datasource = Ready
+Tempo search = actuator, security filter, scheduler trace 확인
+Business route search(/api/v1/time-deals) = 아직 비어 있음
+Loki trace_id = 앱 로그 패턴은 있으나 요청 로그에 trace_id가 충분히 남지 않음
+```
+
+해석:
+
+```text
+플랫폼 trace 경로는 열렸지만, 비즈니스 요청 1건을 운영 증거로 쓰기에는
+application instrumentation / trace attribute / log correlation 검증이 더 필요하다.
+```
 
 ### 성공 기준
 

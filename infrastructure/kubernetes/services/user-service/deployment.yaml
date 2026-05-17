@@ -16,7 +16,7 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8081"
         prometheus.io/path: "/actuator/prometheus"
-        config.pposiraegi.io/app-config-version: "tracing-otlp-v2"
+        config.pposiraegi.io/app-config-version: "observability-otlp-metrics-off"
     spec:
       serviceAccountName: user-service
       containers:

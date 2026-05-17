@@ -16,5 +16,6 @@ data:
   PROMETHEUS_BASE_URL: "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090"
   MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
   MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT: "http://opentelemetry-collector.monitoring.svc.cluster.local:4318/v1/traces"
+  MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: "false"
   LOGGING_PATTERN_CORRELATION: "trace_id=%X{traceId:-} span_id=%X{spanId:-} "
   LOGGING_INCLUDE_APPLICATION_NAME: "false"
