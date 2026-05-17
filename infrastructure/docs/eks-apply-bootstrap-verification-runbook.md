@@ -328,6 +328,19 @@ kubectl logs -n monitoring -l app.kubernetes.io/name=promtail --tail=100
 정상 상태는 `loki` StatefulSet 1개와 `loki-gateway` Deployment 1개다.
 `loki-read`, `loki-write`, `loki-backend`가 다시 생기면 Simple Scalable mode로 돌아간 것이다.
 
+Tempo / OpenTelemetry Collector 확인:
+
+```bash
+kubectl get deployment opentelemetry-collector -n monitoring
+kubectl get statefulset tempo -n monitoring
+kubectl get svc -n monitoring | grep -E "tempo|opentelemetry"
+kubectl logs -n monitoring deploy/opentelemetry-collector --tail=100
+kubectl logs -n monitoring statefulset/tempo --tail=100
+```
+
+현재 Tempo는 실습 비용을 줄이기 위해 SingleBinary mode와 짧은 retention을 사용한다.
+OpenTelemetry Collector는 앱이 직접 Tempo에 붙지 않도록 중간 ingest endpoint 역할을 한다.
+
 ### 공부 포인트
 
 Monitoring stack은 Prometheus 단품이 아니다.
@@ -337,6 +350,8 @@ Prometheus = metrics 수집/저장
 Grafana = metrics/logs 시각화
 Loki = logs 저장
 AlertManager = 알림 라우팅
+Tempo = traces 저장/조회
+OpenTelemetry Collector = traces 수집/전달
 PVC/EBS CSI = 상태 저장 기반
 ```
 
@@ -347,6 +362,46 @@ PVC/EBS CSI = 상태 저장 기반
 - scrape 403 = Istio AuthorizationPolicy 문제
 - Grafana 비어 있음 = datasource/dashboard 문제
 - Loki 로그 없음 = promtail/label/S3/IRSA 문제
+- Tempo trace 없음 = app tracing dependency / OTLP endpoint / Collector / Tempo datasource 문제
+
+Tempo는 특히 다음 두 상태를 구분해야 한다.
+
+```text
+Tempo/Collector Ready = trace를 받을 플랫폼 경로가 열림
+Tempo trace 검색 성공 = 앱이 실제 span을 만들어 OTLP로 export함
+```
+
+오늘 확인한 실패 패턴:
+
+```text
+Prometheus scrape UP
+Loki access log 수집 OK
+Tempo search traces=[]
+```
+
+이 경우 Tempo 설치 문제가 아니라, 앱의 tracing exporter 계약을 먼저 본다.
+
+확인할 설정:
+
+```yaml
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: http://opentelemetry-collector.monitoring.svc.cluster.local:4318/v1/traces
+```
+
+Kubernetes env로는 다음 이름이 핵심이다.
+
+```text
+MANAGEMENT_TRACING_SAMPLING_PROBABILITY
+MANAGEMENT_OTLP_TRACING_ENDPOINT
+```
+
+`MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT`처럼 잘못된 property 이름을 쓰면
+Collector와 Tempo가 정상이어도 앱 span이 전송되지 않는다.
 
 ### 성공 기준
 
@@ -354,6 +409,8 @@ PVC/EBS CSI = 상태 저장 기반
 - PVC Bound
 - Prometheus target 화면에서 서비스 target 확인 가능
 - Grafana datasource 정상
+- Tempo `statefulset/tempo` Ready
+- OpenTelemetry Collector Ready
 
 ## 7. ArgoCD Sync / 앱 배포
 
@@ -449,6 +506,72 @@ management:
 - `/actuator/health` 200
 - `/actuator/prometheus` 200
 - Prometheus target UP
+
+## 8-1. Business Request / Observability 확인
+
+### 목적
+
+앱이 뜬 것을 넘어서, 실제 비즈니스 요청이 metrics/logs/traces 중 어디까지 남는지 확인한다.
+
+### 명령
+
+클러스터 내부에서 게이트웨이를 호출한다.
+
+```bash
+kubectl run pposiraegi-read --rm -i --restart=Never \
+  --image=curlimages/curl:8.7.1 \
+  -n production -- \
+  sh -c 'curl -sS -i http://api-gateway:8080/api/v1/time-deals | head -80'
+```
+
+Prometheus scrape 확인:
+
+```bash
+kubectl run pposiraegi-prom-up --rm -i --restart=Never \
+  --image=curlimages/curl:8.7.1 \
+  -n monitoring -- \
+  sh -c 'curl -s "http://kube-prometheus-stack-prometheus:9090/api/v1/query?query=sum%20by%20(service)%20(up%7Bjob%3D%22spring-boot-services%22%7D)"'
+```
+
+Loki 로그 확인:
+
+```bash
+kubectl run pposiraegi-loki-read --rm -i --restart=Never \
+  --image=curlimages/curl:8.7.1 \
+  -n monitoring -- \
+  sh -c 'curl -sG "http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/query_range" \
+    --data-urlencode "query={namespace=\"production\"} |= \"time-deals\"" \
+    --data-urlencode "limit=20" | head -c 4000'
+```
+
+Tempo 검색 확인:
+
+```bash
+kubectl run pposiraegi-tempo-read --rm -i --restart=Never \
+  --image=curlimages/curl:8.7.1 \
+  -n monitoring -- \
+  sh -c 'curl -sG "http://tempo:3200/api/search" \
+    --data-urlencode "q={}" \
+    --data-urlencode "limit=5"'
+```
+
+### 성공 기준
+
+```text
+Prometheus: service별 up이 2로 나온다.
+Loki: api-gateway/product-service access log에 같은 요청이 남는다.
+Tempo: trace가 1개 이상 검색된다.
+```
+
+Tempo만 비어 있으면 다음 순서로 본다.
+
+```text
+앱 tracing dependency
+-> MANAGEMENT_OTLP_TRACING_ENDPOINT
+-> Collector logs
+-> Tempo service 4317/4318
+-> Grafana datasource 3200
+```
 
 ## 9. Istio AuthorizationPolicy 확인
 
@@ -588,6 +711,7 @@ scrape 403 -> Istio AuthorizationPolicy
 target down -> Service annotation / endpoint / port
 Grafana empty -> datasource / dashboard
 Loki empty -> promtail / label / S3 / IRSA
+Tempo empty -> app tracing dependency / OTLP endpoint / Collector / Tempo datasource
 ```
 
 ## 12. 학습용 해석 문장
@@ -634,6 +758,8 @@ AWS팀: S3/LB/EC2 API 권한은 IRSA로 받았나요?
 - [ ] /actuator/health 200
 - [ ] /actuator/prometheus 200
 - [ ] Prometheus target UP
+- [ ] Loki에서 비즈니스 요청 로그 확인
+- [ ] Tempo에서 trace 검색 가능
 - [ ] 일반 Pod metrics 접근 차단
 - [ ] TGB target healthy
 

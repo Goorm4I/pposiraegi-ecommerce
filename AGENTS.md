@@ -47,8 +47,10 @@
 - Waypoint: `minAvailable: 1` (waypoint-pdb)
 
 ### 모니터링
-- Prometheus scrape: `/actuator/prometheus` (포트 8080)
-- 별도 management port 분리 없음 — Istio AuthorizationPolicy로 접근 제어
+- Prometheus scrape: `/actuator/prometheus` (management 포트 8081)
+- 앱 트래픽 8080 / actuator 8081 분리 — probe, scrape, SecurityFilter 충돌을 줄이기 위한 현재 구현
+- Istio AuthorizationPolicy는 `/actuator/prometheus` 접근을 Prometheus SA 중심으로 제한
+- Tempo tracing: OpenTelemetry Collector(`opentelemetry-collector.monitoring.svc:4318`) 경유, Tempo single binary 저장
 
 ---
 
@@ -80,8 +82,10 @@
 - PDB: api-gateway, user-service, product-service, order-service
 - IRSA ServiceAccount: 서비스 4개 (role ARN은 `${AWS_ACCOUNT_ID}` 변수화)
 - Deployment: serviceAccountName 연결, prometheus scrape annotation 추가
+- Deployment: management port 8081 기반 readiness/liveness/prometheus scrape
 - Karpenter: NodePool + EC2NodeClass (인스턴스 .large만, AZ a+c)
 - Monitoring: kube-prometheus-stack + Loki Helm values
+- Tracing: Tempo + OpenTelemetry Collector Helm values, Spring Boot OpenTelemetry starter
 - Istio Ambient: istiod/cni/ztunnel values, waypoint(replicas:2+PDB), authorization-policy
 - CI: deploy-all.yml ECS 잔재 제거, kubectl rollout restart로 교체
 - Gradle: micrometer-registry-prometheus 추가 (common-web-mvc, api-gateway)

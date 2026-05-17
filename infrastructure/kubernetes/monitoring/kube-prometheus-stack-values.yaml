@@ -28,10 +28,32 @@ grafana:
       datasources:
       # Prometheus datasource는 chart가 자동 생성 (isDefault: true) — 중복 방지를 위해 선언 생략
       - name: Loki
+        uid: loki
         type: loki
         url: http://loki:3100
         access: proxy
         isDefault: false
+        jsonData:
+          derivedFields:
+          - name: trace_id
+            matcherRegex: 'trace_id=([a-f0-9]+)'
+            datasourceUid: tempo
+            url: '$${__value.raw}'
+      - name: Tempo
+        uid: tempo
+        type: tempo
+        url: http://tempo:3200
+        access: proxy
+        isDefault: false
+        jsonData:
+          tracesToLogsV2:
+            datasourceUid: loki
+            spanStartTimeShift: "-5m"
+            spanEndTimeShift: "5m"
+            filterByTraceID: true
+            filterBySpanID: false
+          serviceMap:
+            datasourceUid: Prometheus
   dashboardProviders:
     dashboardproviders.yaml:
       apiVersion: 1

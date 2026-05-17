@@ -1,0 +1,84 @@
+## OpenTelemetry Collector — 앱 trace ingest 경로
+## helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+## helm upgrade --install opentelemetry-collector open-telemetry/opentelemetry-collector \
+##   -n monitoring --version 0.153.0 -f otel-collector-values.yaml
+
+mode: deployment
+replicaCount: 1
+
+image:
+  repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
+
+command:
+  name: otelcol-k8s
+
+nodeSelector:
+  karpenter.sh/capacity-type: on-demand
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+ports:
+  otlp:
+    enabled: true
+  otlp-http:
+    enabled: true
+  jaeger-compact:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  zipkin:
+    enabled: false
+  metrics:
+    enabled: true
+
+serviceMonitor:
+  enabled: true
+  extraLabels:
+    release: kube-prometheus-stack
+
+config:
+  receivers:
+    jaeger: null
+    zipkin: null
+    prometheus: null
+    otlp:
+      protocols:
+        grpc:
+          endpoint: ${env:MY_POD_IP}:4317
+        http:
+          endpoint: ${env:MY_POD_IP}:4318
+
+  processors:
+    memory_limiter:
+      check_interval: 5s
+      limit_percentage: 80
+      spike_limit_percentage: 25
+    batch: {}
+
+  exporters:
+    debug: null
+    otlp/tempo:
+      endpoint: tempo.monitoring.svc.cluster.local:4317
+      tls:
+        insecure: true
+
+  service:
+    pipelines:
+      traces:
+        receivers:
+          - otlp
+        processors:
+          - memory_limiter
+          - batch
+        exporters:
+          - otlp/tempo
+      metrics: null
+      logs: null

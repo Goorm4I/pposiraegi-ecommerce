@@ -2,6 +2,9 @@
 
 이 문서는 EKS Phase 3에서 `k6 -> ALB -> api-gateway -> MSA -> RDS/Redis` 흐름을 검증하고, Prometheus/Loki로 운영 신호를 읽기 위한 기준이다.
 
+Tempo 도입 설계는 `infrastructure/docs/tempo-tracing-design-plan.md`에 별도로 둔다.
+이 문서는 현재 가능한 metrics/logs 검증을 기준으로 하고, Tempo가 들어오면 느린 요청 1건의 hop별 지연을 확인하는 단계가 추가된다.
+
 ## 현재 전제
 
 - Prometheus는 임시 `PodMonitor/monitoring/pposiraegi-apps-temp`로 앱 Pod의 `8081/actuator/prometheus`를 직접 scrape한다.
@@ -184,6 +187,24 @@ DB/Redis/gRPC 의심 로그:
 
 ```logql
 {namespace="production"} |~ "timeout|Exception|ERROR|UNAVAILABLE|DEADLINE_EXCEEDED|connection"
+```
+
+## Tempo 도입 후 확인 흐름
+
+Tempo가 설치되고 앱 trace export가 연결되면 느림 진단 순서는 다음처럼 확장한다.
+
+```text
+1. Prometheus: 어떤 endpoint의 p95가 튀었는지 확인
+2. Loki: 같은 시간대 timeout/error/pool exhaustion 로그 확인
+3. Tempo: 느린 요청 trace를 열어 gateway/order/product/user hop별 duration 확인
+```
+
+검증 기준:
+
+```text
+단일 주문 smoke에서 api-gateway와 order-service span이 같은 trace id로 묶인다.
+k6 테스트에서 느린 /api/v1/orders/submit 요청의 trace를 Grafana Explore에서 찾을 수 있다.
+Loki 로그의 trace_id와 Tempo trace id가 연결된다.
 ```
 
 ## 운영 해석 포인트

@@ -57,6 +57,11 @@ argocd_status="$(safe kubectl get application pposiraegi -n argocd -o jsonpath='
 hpa_status="$(safe kubectl get hpa -n production --no-headers | awk '{ print $1 ":" $6 "/" $7 }' | paste -sd ', ' -)"
 [[ -z "${hpa_status}" ]] && hpa_status="unavailable"
 
+tempo_status="$(safe kubectl get statefulset tempo -n monitoring -o jsonpath='{.status.readyReplicas}/{.status.replicas}')"
+[[ -z "${tempo_status}" ]] && tempo_status="unavailable"
+otel_status="$(safe kubectl get deployment opentelemetry-collector -n monitoring -o jsonpath='{.status.readyReplicas}/{.status.replicas}')"
+[[ -z "${otel_status}" ]] && otel_status="unavailable"
+
 timestamp="$(date '+%Y-%m-%d %H:%M:%S %Z')"
 message="$(cat <<EOF
 pposiraegi cluster summary (${timestamp})
@@ -80,6 +85,10 @@ Karpenter:
 GitOps:
 - ArgoCD pposiraegi: ${argocd_status}
 - HPA: ${hpa_status}
+
+Tracing:
+- Tempo: ${tempo_status}
+- OpenTelemetry Collector: ${otel_status}
 EOF
 )"
 

@@ -234,6 +234,31 @@ destroy 후 available EBS volume이 남으면 삭제한다.
 단, 삭제 전 반드시 PVC tag와 상태 available을 확인한다.
 ```
 
+2026-05-13 보정:
+
+```text
+cleanup-karpenter-before-destroy.sh는 destroy 전에 monitoring Helm release와 PVC를 먼저 정리한다.
+이 단계가 실패하거나 생략되면 cluster 삭제 후 EBS CSI가 PVC 삭제 이벤트를 처리하지 못해
+available EBS volume이 남을 수 있다.
+```
+
+권장 순서:
+
+```bash
+AWS_PROFILE=goorm ./scripts/cleanup-karpenter-before-destroy.sh --yes --notify --timeout 420
+AWS_PROFILE=goorm ./scripts/check-residue.sh
+cd infrastructure
+AWS_PROFILE=goorm terraform destroy
+cd ..
+AWS_PROFILE=goorm ./scripts/check-residue.sh
+```
+
+보존이 필요한 monitoring 데이터가 있을 때만:
+
+```bash
+AWS_PROFILE=goorm ./scripts/cleanup-karpenter-before-destroy.sh --yes --keep-monitoring-pvc
+```
+
 ### EKS Access Entry
 
 의미:

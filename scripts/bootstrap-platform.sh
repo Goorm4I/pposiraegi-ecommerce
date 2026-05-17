@@ -42,6 +42,8 @@ ISTIO_VERSION="1.25.1"
 PROM_STACK_VERSION="67.9.0"
 LOKI_VERSION="6.29.0"
 PROMTAIL_VERSION="6.16.6"
+TEMPO_VERSION="1.24.4"
+OTEL_COLLECTOR_VERSION="0.153.0"
 ESO_VERSION="0.14.0"
 FRONTEND_PIPELINE_NAME="${FRONTEND_PIPELINE_NAME:-pposiraegi-frontend-pipeline}"
 
@@ -114,6 +116,35 @@ wait_crd() {
 helm_repo_add() {
   local name="$1" url="$2"
   helm repo list 2>/dev/null | grep -q "^${name}\s" || helm repo add "${name}" "${url}"
+}
+
+tempo_readiness_message() {
+  local tempo_statefulset collector_deploy tempo_svc collector_svc
+
+  tempo_statefulset="$(kubectl get statefulset tempo -n monitoring -o jsonpath='{.status.readyReplicas}/{.status.replicas}' 2>/dev/null || true)"
+  collector_deploy="$(kubectl get deployment opentelemetry-collector -n monitoring -o jsonpath='{.status.readyReplicas}/{.status.replicas}' 2>/dev/null || true)"
+  tempo_svc="$(kubectl get svc tempo -n monitoring -o jsonpath='{range .spec.ports[*]}{.name}:{.port}{" "}{end}' 2>/dev/null || true)"
+  collector_svc="$(kubectl get svc opentelemetry-collector -n monitoring -o jsonpath='{range .spec.ports[*]}{.name}:{.port}{" "}{end}' 2>/dev/null || true)"
+
+  [[ -z "${tempo_statefulset}" ]] && tempo_statefulset="unavailable"
+  [[ -z "${collector_deploy}" ]] && collector_deploy="unavailable"
+  [[ -z "${tempo_svc}" ]] && tempo_svc="unavailable"
+  [[ -z "${collector_svc}" ]] && collector_svc="unavailable"
+
+  cat <<EOF
+pposiraegi tempo readiness (${CLUSTER_NAME}/${AWS_REGION})
+
+Tempo:
+- statefulset ready: ${tempo_statefulset}
+- service ports: ${tempo_svc}
+
+OpenTelemetry Collector:
+- deployment ready: ${collector_deploy}
+- service ports: ${collector_svc}
+
+Trace path:
+Spring Boot app -> opentelemetry-collector:4318/v1/traces -> tempo:4317 -> Grafana Tempo datasource (tempo:3200)
+EOF
 }
 
 ###############################################################
@@ -335,11 +366,12 @@ install_storage() {
 # 7. kube-prometheus-stack + Loki
 ###############################################################
 install_monitoring() {
-  log "=== 7. kube-prometheus-stack + Loki 설치 ==="
+  log "=== 7. kube-prometheus-stack + Loki + Tempo 설치 ==="
   load_discord_webhook
   helm_repo_add prometheus-community https://prometheus-community.github.io/helm-charts
   helm_repo_add grafana https://grafana.github.io/helm-charts
-  helm repo update prometheus-community grafana
+  helm_repo_add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+  helm repo update prometheus-community grafana open-telemetry
 
   kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
 
@@ -388,6 +420,23 @@ install_monitoring() {
     --version "${PROMTAIL_VERSION}" \
     -f "${K8S_DIR}/monitoring/promtail-values.yaml" \
     --wait --timeout 5m
+
+  log "  7-5. Tempo (trace backend, single binary)"
+  helm upgrade --install tempo grafana/tempo \
+    --namespace monitoring \
+    --version "${TEMPO_VERSION}" \
+    -f "${K8S_DIR}/monitoring/tempo-values.yaml" \
+    --wait --timeout 10m
+
+  log "  7-6. OpenTelemetry Collector (OTLP ingest -> Tempo)"
+  helm upgrade --install opentelemetry-collector open-telemetry/opentelemetry-collector \
+    --namespace monitoring \
+    --version "${OTEL_COLLECTOR_VERSION}" \
+    -f "${K8S_DIR}/monitoring/otel-collector-values.yaml" \
+    --wait --timeout 10m
+
+  log "  7-7. Tempo readiness Discord report"
+  discord_notify "$(tempo_readiness_message)"
 
   ok "모니터링 스택 완료"
   discord_notify "pposiraegi bootstrap: monitoring stack is ready (${CLUSTER_NAME}/${AWS_REGION})"
@@ -512,11 +561,14 @@ print_summary() {
   printf "    %-30s %s\n" "kube-prometheus-stack" "${PROM_STACK_VERSION}"
   printf "    %-30s %s\n" "Loki"                  "${LOKI_VERSION}"
   printf "    %-30s %s\n" "Promtail"              "${PROMTAIL_VERSION}"
+  printf "    %-30s %s\n" "Tempo"                 "${TEMPO_VERSION}"
+  printf "    %-30s %s\n" "OpenTelemetry Collector" "${OTEL_COLLECTOR_VERSION}"
   printf "    %-30s %s\n" "Frontend Pipeline"     "${FRONTEND_PIPELINE_NAME}"
   printf "    %-30s %s\n" "ESO"                   "${ESO_VERSION}"
   echo ""
   echo "  다음 단계:"
   echo "    Grafana:  kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80 -n monitoring"
+  echo "    Tempo:    kubectl port-forward svc/tempo 3200:3200 -n monitoring"
   echo "    ArgoCD:   kubectl port-forward svc/argocd-server 8080:80 -n argocd"
   echo "    Karpenter: kubectl get nodepools,ec2nodeclasses"
   echo ""

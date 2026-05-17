@@ -1,0 +1,39 @@
+## Tempo — trace backend (single binary mode)
+## helm repo add grafana https://grafana.github.io/helm-charts
+## helm upgrade --install tempo grafana/tempo \
+##   -n monitoring --version 1.24.4 -f tempo-values.yaml
+
+tempo:
+  reportingEnabled: false
+  retention: 24h
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+  storage:
+    trace:
+      backend: local
+      local:
+        path: /var/tempo/traces
+
+service:
+  type: ClusterIP
+
+persistence:
+  enabled: true
+  storageClassName: gp3
+  size: 5Gi
+
+nodeSelector:
+  karpenter.sh/capacity-type: on-demand
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
